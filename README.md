@@ -71,8 +71,8 @@ The block opens beside it, or focuses the one already open in the tab, and shows
 
 The graph is jj's own layout (`ui.graph.style=curved`): `graph.luau` reads each graph
 character as strokes from its cell's center, and `jj.css` draws them, so lanes stay
-continuous whatever the row height. Corners and the branches leaving a lane turn in
-curves, as in Tern's Git block.
+continuous whatever the row height. A branch leaves its lane at a right angle from a dot on
+the lane and turns in one curve into the lane it joins, as in Tern's Git block.
 
 Every operation is a plain `jj` command, so `u` reverts any of them. The block reloads
 after every `jj` command that finishes in a Tern pane. Outside a repository it shows
@@ -91,6 +91,11 @@ Homebrew, Cargo, Nix and zerobrew locations.
 - `mise run smoke`: uses a temporary jj repository and an independent Tern window
   to verify clean output, added/modified/deleted/renamed file colors, change/commit
   ID colors, and error output outside a repository. Stops the test window and daemon on exit.
+- `mise run graphshot` (or `python3 tests/graphshot.py [ROOT]`): opens the Jujutsu block on a
+  temporary repo with a fork and a merge in an independent Tern window, prints how many curved
+  corners and junction dots it drew, and writes `.dev/shots/live/graph.png` and the graph column
+  crop `graph-crop.png`. Pass another checkout as `ROOT` (e.g. `jj workspace add -r @-`) to
+  compare before and after.
 - Screenshot: `.dev/shots/live/jj-status.png`
 - Rendered element snapshot: `.dev/status-tree.json`
 - Development logs: `.dev/logs/`

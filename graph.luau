@@ -190,48 +190,14 @@ local function node(row: GraphRow): Node
 	return ui.el("span", { class = class })
 end
 
-local function has(c: Cell?, s: string): boolean
-	return c ~= nil and string.find(c.strokes, s, 1, true) ~= nil
-end
-
--- The cell where the horizontal run through cell `i` ends towards `step` (-1, 1): past `─`
--- and the `┬`/`┴` branching off it, at the first cell the run turns or stops in.
-local function run_end(cells: { Cell }, i: number, step: number): Cell?
-	local j = i + step
-	while cells[j] and has(cells[j], "l") and has(cells[j], "r") and not (has(cells[j], "t") and has(cells[j], "b")) do
-		j += step
-	end
-	return cells[j]
-end
-
--- A lane that runs on vertically through the end of a horizontal run.
-local function through(c: Cell?): boolean
-	return has(c, "t") and has(c, "b")
-end
-
--- Where cell `i` turns between a horizontal and a vertical stroke, as the quadrant the curve
+-- Where cell `c` turns between a horizontal and a vertical stroke, as the quadrant the curve
 -- takes (its horizontal side, then its vertical one: `"lb"` for `╮`), and the strokes still
--- drawn straight. A corner turns; a junction keeps its through stroke straight and curves its
--- branch the way the lanes flow: `├─╮` as `╰─╮`, `├─╯` as `╭─╯`, `├─┬─╮` with the `┬`
--- turning from the left. Anything else stays straight.
-local function turn(cells: { Cell }, i: number): (string?, string)
-	local s = cells[i].strokes
+-- drawn straight. Only corners turn: a junction stays square where its branch leaves the lane,
+-- so `├─╮` meets the lane at a right angle and curves once, into the lane it joins.
+local function turn(c: Cell): (string?, string)
+	local s = c.strokes
 	if s == "lb" or s == "lt" or s == "rb" or s == "rt" then
 		return s, ""
-	elseif s == "tbr" or s == "tbl" then
-		local side = string.sub(s, 3)
-		local e = run_end(cells, i, if side == "r" then 1 else -1)
-		if has(e, "b") and not has(e, "t") then
-			return side .. "t", "tb"
-		elseif has(e, "t") and not has(e, "b") then
-			return side .. "b", "tb"
-		end
-	elseif s == "lrb" or s == "lrt" then
-		local v = string.sub(s, 3)
-		local left, right = through(run_end(cells, i, -1)), through(run_end(cells, i, 1))
-		if left ~= right then
-			return (if left then "l" else "r") .. v, "lr"
-		end
 	end
 	return nil, s
 end
@@ -258,7 +224,7 @@ function M.view(row: GraphRow, width: number): Node
 				blank = 0
 			end
 			local class = "jj-gc jj-l" .. ((i - 1) // 2) % 6
-			local quadrant, straight = turn(row.cells, i)
+			local quadrant, straight = turn(c)
 			for s in string.gmatch(straight, ".") do
 				class ..= " jj-s" .. s
 			end
@@ -286,6 +252,9 @@ function M.view(row: GraphRow, width: number): Node
 				end
 			elseif quadrant then
 				inner = { ui.el("span", { class = "jj-k jj-k-" .. quadrant }) }
+			elseif c.strokes == "tbr" or c.strokes == "tbl" then
+				-- Where a branch leaves or joins a lane: a dot on the lane, as in Tern's Git block.
+				inner = { ui.el("span", { class = "jj-j" }) }
 			end
 			table.insert(kids, ui.el("span", { class = class, min = { w = w }, max = { w = w } }, inner))
 		end

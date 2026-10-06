@@ -49,3 +49,8 @@ extends = "dev"
 description = "Exercise the status lens in a real Tern window (requires Python 3)"
 depends = ["setup", "check"]
 run = "python3 tests/smoke.py"
+
+[tasks.graphshot]
+extends = "dev"
+description = "Screenshot the Jujutsu block's graph for a forked/merged repo (requires a desktop session)"
+run = "python3 tests/graphshot.py"

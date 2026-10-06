@@ -259,6 +259,18 @@
 .jj-cxh {
 	background: linear-gradient(var(--l3), var(--l3)) left center / 50% 1px no-repeat;
 }
+/* The dot where a branch leaves or joins a lane (`├`, `┤`). */
+.jj-j {
+	position: absolute;
+	z-index: 1;
+	left: 50%;
+	top: 50%;
+	transform: translate(-50%, -50%);
+	width: 7px;
+	height: 7px;
+	border-radius: 50%;
+	background: var(--lane);
+}
 
 /* Nodes */
 .jj-n {
