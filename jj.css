@@ -271,6 +271,10 @@
 	border-radius: 50%;
 	background: var(--lane);
 }
+/* A change by the same author as the one above: a filled dot instead of an avatar. */
+.jj-n.jj-dot {
+	background: var(--lane);
+}
 
 /* Nodes */
 .jj-n {

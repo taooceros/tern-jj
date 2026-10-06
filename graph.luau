@@ -38,14 +38,19 @@ local GLYPH_KIND: { [string]: string } = {
 
 export type Cell = { glyph: string, strokes: string, node: boolean, elided: boolean, cross: boolean? }
 
--- A graph row: its cells; for a change, the node's kind, the avatar's initials
--- and color, and whether a ref pill on the left connects to the node.
+-- A graph row: its cells; for a change, the node's kind, its author, the avatar's
+-- initials and color, and whether a ref pill on the left connects to the node.
+-- `dot` (set by `link`) draws the node as a filled dot instead of an avatar.
 export type GraphRow = {
 	cells: { Cell },
 	kind: string?,
+	author: string?,
 	label: string?,
 	avatar: number?,
 	connect: boolean?,
+	dot: boolean?,
+	-- Set by `link` on a junction row it moved onto a node: draw nothing for it.
+	hidden: boolean?,
 }
 
 -- Width of one graph character. jj draws a lane every two characters, so this
@@ -134,8 +139,67 @@ local function strokes_up(row: GraphRow?, i: number): boolean
 	return c ~= nil and (c.node or c.elided or string.find(c.strokes, "t", 1, true) ~= nil)
 end
 
--- Connects node and `~` cells to their neighbours, in place.
+local function blank(row: GraphRow, i: number): boolean
+	local c = row.cells[i]
+	return c == nil or (c.strokes == "" and not c.node and not c.elided)
+end
+
+local function set(row: GraphRow, i: number, strokes: string)
+	while #row.cells < i do
+		table.insert(row.cells, { glyph = " ", strokes = "", node = false, elided = false })
+	end
+	row.cells[i].strokes = strokes
+end
+
+-- Moves the junction at row `r`, cell `i` (`├─╮`, `├─╯` and mirrored) onto the node it belongs
+-- to: a fork's to the merge node right above it, a merge's to the parent node right below it.
+-- The branch then runs from the node's side, and the junction row keeps only straight lanes.
+local function fold(rows: { GraphRow }, r: number, i: number): boolean
+	local row = rows[r]
+	local side = string.sub(row.cells[i].strokes, 3)
+	local step = if side == "r" then 1 else -1
+	local j = i + step
+	while row.cells[j] and row.cells[j].strokes == "lr" do
+		j += step
+	end
+	local corner = row.cells[j]
+	local into = if side == "r" then "l" else "r"
+	if not corner or (corner.strokes ~= into .. "b" and corner.strokes ~= into .. "t") then
+		return false
+	end
+	local v = string.sub(corner.strokes, 2)
+	local target = rows[if v == "b" then r - 1 else r + 1]
+	if not target or not (target.cells[i] and target.cells[i].node) then
+		return false
+	end
+	for k = i + step, j, step do
+		if not blank(target, k) then
+			return false
+		end
+	end
+	target.cells[i].strokes ..= side
+	for k = i + step, j - step, step do
+		set(target, k, "lr")
+		row.cells[k].strokes = ""
+	end
+	set(target, j, corner.strokes)
+	corner.strokes = "tb"
+	row.cells[i].strokes = "tb"
+	return true
+end
+
+-- Connects node and `~` cells to their neighbours, in place, and, as in Tern's Git block,
+-- draws an avatar only where the author changes from the avatar or dot above: the rest are
+-- dots. The working copy's ring and the root's diamond show no author, so the next one does.
 function M.link(rows: { GraphRow })
+	local last: string? = nil
+	for _, row in rows do
+		if row.kind then
+			local face = row.label ~= nil and row.kind ~= "wc"
+			row.dot = face and row.kind == "node" and row.author == last
+			last = if face then row.author else nil
+		end
+	end
 	for r, row in rows do
 		for i, c in row.cells do
 			if c.node or c.elided then
@@ -147,6 +211,25 @@ function M.link(rows: { GraphRow })
 					s ..= "b"
 				end
 				c.strokes = s
+			end
+		end
+	end
+	-- A junction next to its change's node: the branch leaves or joins at the node itself. A
+	-- junction row left with only straight lanes is hidden: the lanes run on through the rows
+	-- next to it.
+	for r, row in rows do
+		local folded = false
+		for i, c in row.cells do
+			if not c.node and (c.strokes == "tbr" or c.strokes == "tbl") then
+				folded = fold(rows, r, i) or folded
+			end
+		end
+		if folded then
+			row.hidden = true
+			for _, c in row.cells do
+				if c.node or c.elided or string.find(c.strokes, "[lr]") then
+					row.hidden = nil
+				end
 			end
 		end
 	end
@@ -180,6 +263,9 @@ end
 local function node(row: GraphRow): Node
 	local kind = row.kind or "node"
 	local class = "jj-n jj-n-" .. kind
+	if row.dot then
+		return ui.el("span", { class = class .. " jj-dot" })
+	end
 	if row.avatar then
 		class ..= " jj-a" .. row.avatar
 	end
@@ -247,7 +333,7 @@ function M.view(row: GraphRow, width: number): Node
 				local kind = row.kind or "node"
 				if kind == "wc" then
 					class ..= " jj-nw"
-				elseif not row.label and kind ~= "immutable" then
+				elseif not row.label and not row.dot and kind ~= "immutable" then
 					class ..= " jj-nr"
 				end
 			elseif quadrant then

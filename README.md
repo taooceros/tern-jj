@@ -40,7 +40,7 @@ captured by this lens and retain their normal output.
 ### Log lens
 
 `jj` and `jj log` (with any revset or limit) render as a native "Jujutsu log" card:
-the commit graph drawn natively (see below) with author-initial avatars on the nodes, a lane
+the commit graph drawn natively (see below) with author-initial avatars on the nodes (where the author changes; dots elsewhere), a lane
 color bar, change ID, flags (conflict, divergent, empty), bookmark and tag pills,
 description, muted date and commit ID, one row per change.
 Click a row to copy its change ID.
@@ -59,7 +59,7 @@ The block opens beside it, or focuses the one already open in the tab, and shows
 - jj's default log revset (up to 200 changes) as a native commit graph in the look of Tern's
   Git block: columns Bookmarks / Graph / Description / Date / Change, bookmark and tag pills
   on the left joined to their node by a hairline (the bookmark on the working copy is filled),
-  round author-initial avatars on the lanes, a lane-colored bar before the description,
+  round author-initial avatars on the lanes where the author changes and dots for the rest, a lane-colored bar before the description,
   muted dates, monospace change IDs with the unique prefix highlighted, a Working copy
   row with file-count pills, and a footer. Forks, merges and elided revisions follow jj's layout;
   the working copy is a ring, immutable changes diamonds, conflicts and divergence pills in red.
@@ -71,8 +71,9 @@ The block opens beside it, or focuses the one already open in the tab, and shows
 
 The graph is jj's own layout (`ui.graph.style=curved`): `graph.luau` reads each graph
 character as strokes from its cell's center, and `jj.css` draws them, so lanes stay
-continuous whatever the row height. A branch leaves its lane at a right angle from a dot on
-the lane and turns in one curve into the lane it joins, as in Tern's Git block.
+continuous whatever the row height. A branch leaves its lane at a right angle and turns in one
+curve into the lane it joins, as in Tern's Git block: from the side of the change's node when
+the fork or merge is next to it, else from a dot on the lane.
 
 Every operation is a plain `jj` command, so `u` reverts any of them. The block reloads
 after every `jj` command that finishes in a Tern pane. Outside a repository it shows

@@ -199,6 +199,7 @@ local function view(state: State): Node?
 		grows[i] = {
 			cells = cells,
 			kind = if c then kind_of(c, cells) else nil,
+			author = if c and not root then c.author else nil,
 			label = if c and not root and c.author ~= "" then graph.initials(c.author) else nil,
 			avatar = if c and not root and c.author ~= "" then graph.avatar(c.author) else nil,
 		}
@@ -207,6 +208,9 @@ local function view(state: State): Node?
 	local width = graph.width(grows)
 	local lines: { Node } = {}
 	for i, r in state.rows do
+		if grows[i].hidden then
+			continue
+		end
 		local g = graph.view(grows[i], width)
 		local c = r.change
 		if not c then

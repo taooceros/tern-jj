@@ -207,6 +207,7 @@ local function parse_log(stdout: string): ({ Row }, { Change })
 				table.insert(rows, {
 					cells = cells,
 					kind = kind_of(change),
+					author = if root then nil else who,
 					label = if root or who == "" then nil else graph.initials(who),
 					avatar = if root then nil else graph.avatar(who),
 					connect = change.bookmarks ~= "" or change.tags ~= "",
@@ -612,7 +613,9 @@ local function graph_view(state: State): { Node }
 	local width = math.max(graph.width(state.rows), 4)
 	local rows: { Node } = {}
 	for i, row in state.rows do
-		table.insert(rows, row_view(state, row, i, width))
+		if not row.hidden then
+			table.insert(rows, row_view(state, row, i, width))
+		end
 	end
 	local changes = state.changes or {}
 	local foot: string
