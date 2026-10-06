@@ -38,18 +38,22 @@ with tempfile.TemporaryDirectory(prefix="tern-jj-graph-", dir="/tmp") as tempora
         subprocess.run(["jj", *args], cwd=repo, env=env, check=True, capture_output=True)
 
     # @  top / ○ merge / ├─╮ / │ ○ left 2 / │ ○ left / ○ │ right / ├─╯ / │ ○ side / ├─╯ /
-    # │ ○ ada / ├─╯ / ○ base. `ada` is by an author no GitHub account has (initials, no photo);
-    # the rest by the jj user (a GitHub photo when their email has one).
+    # │ ○ ada / ├─╯ / ○ base. Ada Lovelace has no GitHub account (initials, no photo); the rest
+    # are by the jj user (a GitHub photo when their email has one). Several authors: `left` is
+    # co-authored by Ada and Bob (+2), `side` by Ada (her initial), and `merge` brings in
+    # `left 2`, by Ada (her initial on the jj user's avatar).
+    ada = ["--config", "user.name=Ada Lovelace", "--config", "user.email=ada@tern-jj.invalid"]
     subprocess.run(["jj", "git", "init", "--no-colocate", str(repo)], check=True, env=env,
                    capture_output=True)
     jj("describe", "-m", "base")
-    jj("new", "-m", "left")
-    jj("new", "-m", "left 2")
+    jj("new", "-m", "left\n\nCo-authored-by: Ada Lovelace <ada@tern-jj.invalid>\n"
+       "Co-authored-by: Bob <bob@tern-jj.invalid>")
+    jj("new", "-m", "left 2", *ada)
     jj("new", "@--", "-m", "right")
     jj("new", "@", "description(glob:'left 2*')", "-m", "merge")
-    jj("new", "description(glob:'base*')", "-m", "ada", "--config", "user.name=Ada Lovelace",
-       "--config", "user.email=ada@tern-jj.invalid")
-    jj("new", "description(glob:'base*')", "-m", "side")
+    jj("new", "description(glob:'base*')", "-m", "ada", *ada)
+    jj("new", "description(glob:'base*')", "-m",
+       "side\n\nCo-authored-by: Ada Lovelace <ada@tern-jj.invalid>")
     jj("new", "description(glob:'merge*')", "-m", "top")
 
     package = work / "package"
@@ -109,6 +113,8 @@ with tempfile.TemporaryDirectory(prefix="tern-jj-graph-", dir="/tmp") as tempora
             time.sleep(0.2)
         initials = [n.get("text") for n in ctl(f"tree {SURFACE} .jj-av")["nodes"] if n.get("text")]
         print("photos", len(ctl(f"tree {SURFACE} .jj-ph")["nodes"]), "initials", initials)
+        badges = [n.get("text") or "photo" for n in ctl(f"tree {SURFACE} .jj-co")["nodes"]]
+        print("co-author badges", badges)
         time.sleep(0.5)
         png = ctl("shot graph")["png"]
     finally:
