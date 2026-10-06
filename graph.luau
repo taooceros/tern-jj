@@ -55,6 +55,8 @@ export type GraphRow = {
 	author: string?,
 	label: string?,
 	avatar: number?,
+	-- Set by `layout` on a merge: drawn as a hollow ring, without an avatar.
+	merge: boolean?,
 	connect: boolean?,
 	dot: boolean?,
 	photo: string?,
@@ -91,7 +93,8 @@ function M.initials(name: string): string
 	return "?"
 end
 
--- A stable avatar color (0–7) for an author: FNV-1a over the name.
+-- A stable avatar color (0–7) for an author: FNV-1a over their lowercased email (the one
+-- identity both the block and the lens have), else their name.
 function M.avatar(name: string): number
 	local h = 2166136261
 	for i = 1, #name do
@@ -202,7 +205,7 @@ end
 
 -- As in Tern's Git block, an avatar only where the author changes from the avatar or dot
 -- above, or (with `tips`, by row) at the top of a branch: the rest are dots. The working
--- copy's ring and the root's diamond show no author, so the next one does.
+-- copy's ring, a merge's ring and the root's diamond show no author, so the next one does.
 local function faces(rows: { GraphRow }, tips: { [number]: boolean }?)
 	local last: string? = nil
 	for r, row in rows do
@@ -215,9 +218,12 @@ local function faces(rows: { GraphRow }, tips: { [number]: boolean }?)
 	end
 end
 
+-- Assigned below `trace`: who gets an avatar, a dot or a merge ring, shared by both layouts.
+local roles: (rows: { GraphRow }) -> { [string]: { string } }
+
 -- Connects node and `~` cells to their neighbours, in place, keeping jj's layout.
 function M.link(rows: { GraphRow })
-	faces(rows)
+	roles(rows)
 	for r, row in rows do
 		for i, c in row.cells do
 			if c.node or c.elided then
@@ -315,11 +321,11 @@ end
 -- above, the lanes leaving it for its other parents, and whether a lane runs on above/below it.
 type Place = { cell: Cell, lane: number, ends: { number }, news: { number }, top: boolean, bottom: boolean }
 
--- Lays the graph out as Tern's Git block does, in place: jj's order and edges, but every edge
--- keeps its own lane down to its parent, where it turns into the parent's row, so a parent's
--- children stem from it at different lengths. Only rows with a node or `~` stay; jj's
--- junction rows are hidden.
-function M.layout(rows: { GraphRow })
+-- Decides how each change's node is drawn, the same in the block and the `jj log` lens: a
+-- merge is a hollow ring on its lane (no avatar), and `faces` puts an avatar where the
+-- authors change or a branch starts (a change no change above has as its parent). Returns
+-- each vertex's edges (`"row:cell"` keys), as jj drew them.
+roles = function(rows: { GraphRow }): { [string]: { string } }
 	local edges: { [string]: { string } } = {}
 	local parents: { [string]: boolean } = {}
 	for r, row in rows do
@@ -334,16 +340,28 @@ function M.layout(rows: { GraphRow })
 			end
 		end
 	end
-	-- A branch's top: a change no change above has as its parent.
 	local tips: { [number]: boolean } = {}
 	for r, row in rows do
 		for i, c in row.cells do
 			if c.node and not parents[r .. ":" .. i] then
 				tips[r] = true
 			end
+			if c.node and row.kind == "node" and #edges[r .. ":" .. i] > 1 then
+				row.merge = true
+				row.label = nil
+			end
 		end
 	end
 	faces(rows, tips)
+	return edges
+end
+
+-- Lays the graph out as Tern's Git block does, in place: jj's order and edges, but every edge
+-- keeps its own lane down to its parent, where it turns into the parent's row, so a parent's
+-- children stem from it at different lengths. Only rows with a node or `~` stay; jj's
+-- junction rows are hidden.
+function M.layout(rows: { GraphRow })
+	local edges = roles(rows)
 	local slots: { string | false } = {}
 	local places: { [number]: { Place } } = {}
 	local passing: { [number]: { [number]: boolean } } = {}
@@ -485,7 +503,7 @@ end
 -- ring for the working copy, a diamond for an immutable one.
 local function node(row: GraphRow): Node
 	local kind = row.kind or "node"
-	local class = "jj-n jj-n-" .. kind
+	local class = "jj-n jj-n-" .. kind .. (if row.merge then " jj-merge" else "")
 	if row.dot then
 		return ui.el("span", { class = class .. " jj-dot" })
 	end
@@ -589,7 +607,7 @@ function M.view(row: GraphRow, width: number): Node
 				if kind == "wc" then
 					class ..= " jj-nw"
 				elseif not row.label and not row.dot and kind ~= "immutable" then
-					class ..= " jj-nr"
+					class ..= if row.merge then " jj-nr jj-nm" else " jj-nr"
 				end
 			elseif quadrant then
 				inner = { ui.el("span", { class = "jj-k jj-k-" .. quadrant }) }

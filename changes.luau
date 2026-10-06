@@ -267,7 +267,7 @@ local function parse_log(stdout: string): ({ Row }, { Change })
 					-- The whole team: a change by the same people as the one above is a dot.
 					author = if root then nil else change.names,
 					label = if root or who == "" then nil else graph.initials(who),
-					avatar = if root then nil else graph.avatar(who),
+					avatar = if root then nil else graph.avatar(if change.email ~= "" then string.lower(change.email) else who),
 					connect = change.bookmarks ~= "" or change.tags ~= "",
 					change = change,
 					elided = false,
@@ -628,7 +628,8 @@ local function row_view(state: State, row: Row, i: number, width: number): Node
 	for n = 2, #c.people do
 		local p = c.people[n]
 		local who = if p.name ~= "" then p.name else p.email
-		table.insert(extra, { name = who, label = graph.initials(who), avatar = graph.avatar(who), photo = photo_of(state, p) })
+		local key = if p.email ~= "" then string.lower(p.email) else who
+		table.insert(extra, { name = who, label = graph.initials(who), avatar = graph.avatar(key), photo = photo_of(state, p) })
 	end
 	row.extra = extra
 	row.pick = pick

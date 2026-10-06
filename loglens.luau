@@ -201,7 +201,7 @@ local function view(state: State): Node?
 			kind = if c then kind_of(c, cells) else nil,
 			author = if c and not root then c.author else nil,
 			label = if c and not root and c.author ~= "" then graph.initials(c.author) else nil,
-			avatar = if c and not root and c.author ~= "" then graph.avatar(c.author) else nil,
+			avatar = if c and not root and c.author ~= "" then graph.avatar(string.lower(c.author)) else nil,
 		}
 	end
 	graph.link(grows)

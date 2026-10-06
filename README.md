@@ -40,9 +40,13 @@ captured by this lens and retain their normal output.
 ### Log lens
 
 `jj` and `jj log` (with any revset or limit) render as a native "Jujutsu log" card:
-the commit graph drawn natively (see below) with author-initial avatars on the nodes (where the author changes; dots elsewhere), a lane
+the commit graph drawn natively (see below) with author-initial avatars on the nodes, decided as
+in the Jujutsu block (where the author changes and at the top of every branch, dots elsewhere,
+merges as hollow rings, the same color per email), a lane
 color bar, change ID, flags (conflict, divergent, empty), bookmark and tag pills,
 description, muted date and commit ID, one row per change.
+The lens shows initials only: a lens can't send images to Tern (no `blob` on its `cx`), and
+jj's default log output doesn't carry co-authors.
 Click a row to copy its change ID.
 Output in another format (`-T`/`--template`, `--no-graph`, `-p`, `-s`, `--stat`, …),
 errors, and output the lens can't read stay raw.
@@ -61,10 +65,11 @@ The block opens beside it, or focuses the one already open in the tab, and shows
   on the left joined to their node by a hairline (the bookmark on the working copy is filled),
   round avatars on the lanes where the authors change and at the top of every branch, dots for
   the rest; an avatar shows the author's GitHub picture when GitHub knows their email, else
-  their initials. A change with several authors (`Co-authored-by:` trailers, or a merge
-  whose other parents are by someone else) adds a small badge on the avatar's corner: the
+  their initials. A merge is a hollow ring on its lane, without an avatar. A change with
+  several authors (`Co-authored-by:` trailers) adds a small badge on the avatar's corner: the
   other author's face or initial, or `+N` for several; hovering the avatar and the dock list
-  everyone. A lane-colored bar before the description,
+  everyone (for a merge, the dock lists its author and those of the parents it brings in).
+  A lane-colored bar before the description,
   muted dates, monospace change IDs with the unique prefix highlighted, a Working copy
   row with file-count pills, and a footer. Forks, merges and elided revisions follow jj's layout;
   the working copy is a ring, immutable changes diamonds, conflicts and divergence pills in red.
