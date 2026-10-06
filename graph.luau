@@ -38,8 +38,8 @@ local GLYPH_KIND: { [string]: string } = {
 
 -- `hop` colors the cell's horizontal strokes as that lane (by default its column's), for a run
 -- between lanes. `turn` is a curve drawn besides the straight `strokes` (set by `layout` where
--- a run goes on past a corner).
-export type Cell = { glyph: string, strokes: string, node: boolean, elided: boolean, cross: boolean?, hop: number?, turn: string? }
+-- a run goes on past a corner). `join` marks a junction a branch only flows into (set by `link`).
+export type Cell = { glyph: string, strokes: string, node: boolean, elided: boolean, cross: boolean?, hop: number?, turn: string?, join: boolean? }
 
 -- Another author of a change: their name, initials, avatar color and GitHub picture.
 export type Face = { name: string, label: string, avatar: number, photo: string? }
@@ -228,6 +228,18 @@ local traced: (rows: { GraphRow }) -> { [number]: { number } }
 
 -- Connects node and `~` cells to their neighbours, in place, keeping jj's layout.
 function M.link(rows: { GraphRow })
+	-- jj's curved style draws a branch joining a lane that goes on as `╭─┤` (its ASCII style:
+	-- `|/|`): the `╭` drops the lane's top, so the lane above would stop there. A `╭` or `╮`
+	-- under a line that strokes down into it is that junction: `├` or `┤`.
+	for r, row in rows do
+		local above = rows[r - 1]
+		for i, c in row.cells do
+			local up = above and above.cells[i]
+			if (c.strokes == "rb" or c.strokes == "lb") and up and not up.node and string.find(up.strokes, "b", 1, true) then
+				c.strokes, c.join = "tb" .. string.sub(c.strokes, 1, 1), true
+			end
+		end
+	end
 	roles(rows, traced(rows))
 	for r, row in rows do
 		for i, c in row.cells do
@@ -293,7 +305,8 @@ local function trace(rows: { GraphRow }, r: number, i: number, from: string, out
 		return
 	end
 	local exits: string
-	if from == "t" and s == "lr" then
+	if from == "t" and (s == "lr" or c.join) then
+		-- Straight down across a hop, and through a join (repaired `╭`): its branch flows in.
 		exits = "b"
 	elseif not string.find(s, from, 1, true) then
 		return
