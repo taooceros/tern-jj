@@ -37,7 +37,9 @@ with tempfile.TemporaryDirectory(prefix="tern-jj-graph-", dir="/tmp") as tempora
     def jj(*args):
         subprocess.run(["jj", *args], cwd=repo, env=env, check=True, capture_output=True)
 
-    # @  top / ○ merge / ├─╮ / │ ○ left 2 / │ ○ left / ○ │ right / ├─╯ / │ ○ side / ├─╯ / ○ base
+    # @  top / ○ merge / ├─╮ / │ ○ left 2 / │ ○ left / ○ │ right / ├─╯ / │ ○ side / ├─╯ /
+    # │ ○ ada / ├─╯ / ○ base. `ada` is by an author no GitHub account has (initials, no photo);
+    # the rest by the jj user (a GitHub photo when their email has one).
     subprocess.run(["jj", "git", "init", "--no-colocate", str(repo)], check=True, env=env,
                    capture_output=True)
     jj("describe", "-m", "base")
@@ -45,13 +47,15 @@ with tempfile.TemporaryDirectory(prefix="tern-jj-graph-", dir="/tmp") as tempora
     jj("new", "-m", "left 2")
     jj("new", "@--", "-m", "right")
     jj("new", "@", "description(glob:'left 2*')", "-m", "merge")
+    jj("new", "description(glob:'base*')", "-m", "ada", "--config", "user.name=Ada Lovelace",
+       "--config", "user.email=ada@tern-jj.invalid")
     jj("new", "description(glob:'base*')", "-m", "side")
     jj("new", "description(glob:'merge*')", "-m", "top")
 
     package = work / "package"
     package.mkdir()
-    for name in ("plugin.toml", "host.luau", "changes.luau", "graph.luau", "loglens.luau",
-                 "window.luau", "jj.css"):
+    for name in ("plugin.toml", "host.luau", "changes.luau", "graph.luau", "avatars.luau",
+                 "loglens.luau", "window.luau", "jj.css"):
         (package / name).write_bytes((ROOT / name).read_bytes())
     subprocess.run([TERN, "plugin", "install", str(package)], check=True, env=env,
                    capture_output=True)
@@ -99,6 +103,12 @@ with tempfile.TemporaryDirectory(prefix="tern-jj-graph-", dir="/tmp") as tempora
             time.sleep(0.2)
         for name, selector in (("corners", ".jj-k"), ("junction dots", ".jj-j")):
             print(name, len(ctl(f"tree {SURFACE} {selector}")["nodes"]))
+        # GitHub avatars arrive after the rows; give them a moment (none without network).
+        deadline = time.monotonic() + 10
+        while not ctl(f"tree {SURFACE} .jj-ph")["nodes"] and time.monotonic() < deadline:
+            time.sleep(0.2)
+        initials = [n.get("text") for n in ctl(f"tree {SURFACE} .jj-av")["nodes"] if n.get("text")]
+        print("photos", len(ctl(f"tree {SURFACE} .jj-ph")["nodes"]), "initials", initials)
         time.sleep(0.5)
         png = ctl("shot graph")["png"]
     finally:
