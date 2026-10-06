@@ -195,18 +195,16 @@ local function view(state: State): Node?
 	for i, r in state.rows do
 		local cells = graph.cells(r.graph)
 		local c = r.change
-		grows[i] = { cells = cells, kind = if c then kind_of(c, cells) else nil }
+		local root = c ~= nil and c.refs == "root()"
+		grows[i] = {
+			cells = cells,
+			kind = if c then kind_of(c, cells) else nil,
+			label = if c and not root and c.author ~= "" then graph.initials(c.author) else nil,
+			avatar = if c and not root and c.author ~= "" then graph.avatar(c.author) else nil,
+		}
 	end
 	graph.link(grows)
 	local width = graph.width(grows)
-	local author_w, time_w = 0, 0
-	for _, r in state.rows do
-		local c = r.change
-		if c then
-			author_w = math.max(author_w, utf8.len(c.author) or 0)
-			time_w = math.max(time_w, #c.time)
-		end
-	end
 	local lines: { Node } = {}
 	for i, r in state.rows do
 		local g = graph.view(grows[i], width)
@@ -235,21 +233,20 @@ local function view(state: State): Node?
 		end
 		local kids: { Node } = {
 			g,
-			text({ ui.span(c.change, if c.node == "@" then "accent strong" else "accent") }, { basis = "content" }),
+			ui.el("span", { class = "jj-bar jj-l" .. graph.lane(grows[i]) }),
+			ui.el("span", { class = "jj-id" .. (if c.node == "@" then " jj-idp" else ""), text = c.change, min = { w = "9ch" }, max = { w = "9ch" } }),
 		}
 		if c.refs ~= "root()" then
 			for name in string.gmatch(c.refs, "%S+") do
-				table.insert(kids, ui.badge(name, "info"))
+				table.insert(kids, ui.el("span", { class = "jj-pill jj-bm" }, {
+					ui.node("icon", { name = "branch" }),
+					ui.el("span", { text = name }),
+				}))
 			end
 		end
 		table.insert(kids, text(desc, { grow = 1, truncate = "end" }))
-		table.insert(kids, text({ ui.span(c.author, "muted") }, {
-			min = { w = math.min(author_w, 14) .. "ch" },
-			max = { w = "24ch" },
-			truncate = "end",
-		}))
-		table.insert(kids, text({ ui.span(c.time, "muted num") }, { min = { w = time_w .. "ch" } }))
-		table.insert(kids, text({ ui.span(c.commit, "info") }, { basis = "content" }))
+		table.insert(kids, ui.el("span", { class = "jj-date", text = string.sub(c.time, 6, 16), title = c.author, min = { w = "11ch" }, max = { w = "11ch" } }))
+		table.insert(kids, ui.el("span", { class = "jj-id", text = c.commit }))
 		table.insert(lines, ui.el("div", {
 			class = "jj-r jj-pick",
 			actions = { click = "copy=" .. c.change },

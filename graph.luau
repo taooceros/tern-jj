@@ -36,10 +36,62 @@ local GLYPH_KIND: { [string]: string } = {
 	["◌"] = "hidden",
 }
 
-export type Cell = { glyph: string, strokes: string, node: boolean, elided: boolean }
+export type Cell = { glyph: string, strokes: string, node: boolean, elided: boolean, cross: boolean? }
 
--- A graph row: its cells, and the node's kind when it holds a change.
-export type GraphRow = { cells: { Cell }, kind: string? }
+-- A graph row: its cells; for a change, the node's kind, the avatar's initials
+-- and color, and whether a ref pill on the left connects to the node.
+export type GraphRow = {
+	cells: { Cell },
+	kind: string?,
+	label: string?,
+	avatar: number?,
+	connect: boolean?,
+}
+
+-- Width of one graph character. jj draws a lane every two characters, so this
+-- spaces lanes wide enough for an avatar; `min`/`max` in `ch` are terminal
+-- cells, and a fractional count works (a stylesheet's `ch` does not).
+local CELL = 1.35
+
+-- `n` graph characters as a `min`/`max` width.
+function M.span(n: number): string
+	return string.format("%.2fch", n * CELL)
+end
+
+-- Initials for an avatar: the first letters of the first two words of a name
+-- (or of an email's local part), else its first two letters.
+function M.initials(name: string): string
+	local base = string.match(name, "^([^@]+)@") or name
+	local words: { string } = {}
+	for w in string.gmatch(base, "[%w]+") do
+		table.insert(words, w)
+	end
+	if #words >= 2 then
+		return string.upper(string.sub(words[1], 1, 1) .. string.sub(words[2], 1, 1))
+	elseif words[1] then
+		return string.upper(string.sub(words[1], 1, 2))
+	end
+	return "?"
+end
+
+-- A stable avatar color (0–5) for an author.
+function M.avatar(name: string): number
+	local h = 0
+	for i = 1, #name do
+		h = (h * 31 + string.byte(name, i)) % 997
+	end
+	return h % 6
+end
+
+-- The lane (0-based) of the row's node, for coloring the row's message bar.
+function M.lane(row: GraphRow): number
+	for i, c in row.cells do
+		if c.node then
+			return ((i - 1) // 2) % 6
+		end
+	end
+	return 0
+end
 
 -- The cells of a graph prefix, trailing blanks trimmed.
 function M.cells(prefix: string): { Cell }
@@ -96,6 +148,15 @@ function M.link(rows: { GraphRow })
 			end
 		end
 	end
+	-- A horizontal hop over a vertical lane: the lane runs through the cell above and below.
+	for r, row in rows do
+		for i, c in row.cells do
+			local hop = string.find(c.strokes, "[lr]") ~= nil and string.find(c.strokes, "[tb]") == nil
+			if hop and not c.node and strokes_down(rows[r - 1], i) and strokes_up(rows[r + 1], i) then
+				c.cross = true
+			end
+		end
+	end
 end
 
 -- The widest row, in cells.
@@ -107,20 +168,45 @@ function M.width(rows: { GraphRow }): number
 	return w
 end
 
-local function spacer(n: number): Node
-	return ui.el("span", { class = "jj-gs", min = { w = n .. "ch" }, max = { w = n .. "ch" } })
+local function spacer(n: number, connector: boolean): Node
+	local w = M.span(n)
+	return ui.el("span", { class = if connector then "jj-gs jj-cx" else "jj-gs", min = { w = w }, max = { w = w } })
 end
 
--- The graph column of `row`, `width` cells wide.
+-- The node: an avatar with the author's initials for an ordinary change, a
+-- ring for the working copy, a diamond for an immutable one.
+local function node(row: GraphRow): Node
+	local kind = row.kind or "node"
+	local class = "jj-n jj-n-" .. kind
+	if row.avatar then
+		class ..= " jj-a" .. row.avatar
+	end
+	local label = row.label
+	if label and kind ~= "wc" then
+		return ui.el("span", { class = class .. " jj-av", text = label })
+	end
+	return ui.el("span", { class = class })
+end
+
+-- The graph column of `row`, `width` characters wide.
 function M.view(row: GraphRow, width: number): Node
 	local kids: { Node } = {}
 	local blank = 0
+	-- Cells left of the node carry the connector from the row's ref pills.
+	local before_node = row.connect == true
 	for i, c in row.cells do
+		if c.node then
+			if blank > 0 then
+				table.insert(kids, spacer(blank, before_node))
+				blank = 0
+			end
+			before_node = false
+		end
 		if c.strokes == "" and not c.node then
 			blank += 1
 		else
 			if blank > 0 then
-				table.insert(kids, spacer(blank))
+				table.insert(kids, spacer(blank, before_node))
 				blank = 0
 			end
 			local class = "jj-gc jj-l" .. ((i - 1) // 2) % 6
@@ -130,19 +216,23 @@ function M.view(row: GraphRow, width: number): Node
 			if c.elided then
 				class ..= " jj-el"
 			end
-			local inner: { Node }? = nil
-			if c.node then
-				inner = { ui.el("span", { class = "jj-n jj-n-" .. (row.kind or "node") }) }
+			if c.cross then
+				class ..= " jj-x"
 			end
-			-- `min`/`max` in `ch` are terminal cells; a stylesheet's `1ch` is not.
-			table.insert(kids, ui.el("span", { class = class, min = { w = "1ch" }, max = { w = "1ch" } }, inner))
+			if before_node then
+				class ..= " jj-cx"
+			elseif c.node and row.connect then
+				class ..= " jj-cxh"
+			end
+			local w = M.span(1)
+			table.insert(kids, ui.el("span", { class = class, min = { w = w }, max = { w = w } }, if c.node then { node(row) } else nil))
 		end
 	end
 	blank += width - #row.cells
 	if blank > 0 then
-		table.insert(kids, spacer(blank))
+		table.insert(kids, spacer(blank, false))
 	end
-	return ui.el("div", { class = "jj-g" }, kids)
+	return ui.el("div", { class = if row.connect then "jj-g jj-gx" else "jj-g" }, kids)
 end
 
 return M

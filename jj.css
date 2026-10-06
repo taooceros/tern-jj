@@ -1,47 +1,147 @@
-/* The commit graph (graph.luau): each cell draws strokes from its center. */
+/* Jujutsu views, styled after Tern's Git block. Scoped to the plugin's block
+   and its lens so nothing leaks into other surfaces. */
+
+/* ── Lanes: one color per graph column, from the theme ─────────────────── */
+.jj-l0 { --lane: var(--accent); }
+.jj-l1 { --lane: var(--live); }
+.jj-l2 { --lane: var(--ok); }
+.jj-l3 { --lane: var(--warn); }
+.jj-l4 { --lane: var(--tk-type, var(--accent)); }
+.jj-l5 { --lane: var(--ink-pen, var(--bad)); }
+
+/* ── Rows ───────────────────────────────────────────────────────────────── */
 .jj-r {
 	display: flex;
 	align-items: center;
 	gap: 10px;
-	padding: 0 8px 0 4px;
-	min-height: calc(var(--sf-lh, 1.4em) + 6px);
-	border-radius: 6px;
+	padding: 0 10px 0 6px;
+	min-height: calc(var(--sf-lh, 18px) + 9px);
+	font-family: var(--sans);
+	font-size: 13px;
+	color: var(--t1);
 }
 .jj-r.jj-edge {
-	min-height: calc(var(--sf-lh, 1.4em) * 0.75);
+	min-height: calc(var(--sf-lh, 18px) * 0.7);
 }
 .jj-r.jj-pick {
 	cursor: default;
+	border-radius: 6px;
 }
 .jj-r.jj-pick:hover {
 	background: var(--l1);
 }
-.jj-r.jj-sel {
-	background: var(--sf-sel, var(--l2));
-	box-shadow: inset 2px 0 0 var(--accent);
+.jj-r.jj-sel,
+.jj-r.jj-sel:hover {
+	background: color-mix(in srgb, var(--accent) 14%, transparent);
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
 }
+
+/* Columns */
+.jj-refs {
+	display: flex;
+	align-items: center;
+	gap: 4px;
+	align-self: stretch;
+	flex: none;
+	overflow: hidden;
+}
+.jj-cline {
+	flex: 1;
+	align-self: stretch;
+	min-width: 6px;
+	background: linear-gradient(var(--l3), var(--l3)) center / 100% 1px no-repeat;
+}
+.jj-msg {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex: 1;
+	min-width: 0;
+}
+.jj-bar {
+	flex: none;
+	width: 3px;
+	height: 15px;
+	border-radius: 2px;
+	background: var(--lane);
+}
+.jj-date {
+	flex: none;
+	color: var(--t3);
+	font-variant-numeric: tabular-nums;
+}
+.jj-id {
+	flex: none;
+	font-family: var(--mono);
+	font-size: 12px;
+	color: var(--t3);
+}
+.jj-id .jj-idp,
+.jj-id.jj-idp {
+	color: var(--accent-ink);
+	font-weight: 600;
+}
+
+/* Ref pills */
+.jj-pill {
+	display: inline-flex;
+	align-items: center;
+	gap: 4px;
+	flex: none;
+	max-width: 100%;
+	padding: 1px 7px;
+	border-radius: var(--r-chip, 6px);
+	font-size: 12px;
+	line-height: 17px;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	color: var(--t1);
+	box-shadow: inset 0 0 0 1px var(--l3);
+	background: var(--card);
+}
+.jj-pill.jj-bm {
+	color: var(--live);
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--live) 45%, transparent);
+}
+.jj-pill.jj-bm.jj-here {
+	color: #fff;
+	background: var(--accent-fill);
+	box-shadow: none;
+}
+.jj-pill.jj-tag {
+	color: var(--warn);
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 50%, transparent);
+}
+.jj-pill.jj-wc {
+	color: var(--ok);
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 45%, transparent);
+	background: color-mix(in srgb, var(--ok) 10%, transparent);
+}
+.jj-pill.jj-conf {
+	color: var(--bad);
+	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bad) 45%, transparent);
+}
+.jj-pill.jj-stat {
+	color: var(--warn);
+	background: color-mix(in srgb, var(--warn) 12%, transparent);
+	box-shadow: none;
+}
+
+/* ── Graph ──────────────────────────────────────────────────────────────── */
 .jj-g {
 	display: flex;
 	align-self: stretch;
 	flex: none;
 	position: relative;
-	z-index: 0;
 	isolation: isolate;
 }
-.jj-gs {
-	display: block;
-}
+.jj-gs,
 .jj-gc {
-	position: relative;
 	display: block;
 	flex: none;
-	--lane: var(--sf-c-accent, var(--accent));
+	position: relative;
 }
-.jj-l1 { --lane: var(--sf-c-success, #3fb950); }
-.jj-l2 { --lane: var(--sf-c-warning, #d29922); }
-.jj-l3 { --lane: var(--sf-c-info, #58a6ff); }
-.jj-l4 { --lane: var(--sf-c-error, #f85149); }
-.jj-l5 { --lane: var(--sf-c-muted, #8b949e); }
 .jj-st::before,
 .jj-sb::before {
 	content: "";
@@ -54,6 +154,7 @@
 }
 .jj-st::before { top: 0; }
 .jj-sb::before { bottom: 0; }
+.jj-st.jj-sb::before { top: 0; bottom: 0; }
 .jj-el::before {
 	background: none;
 	border-left: 2px dotted var(--lane);
@@ -71,35 +172,193 @@
 }
 .jj-sl::after { left: 0; }
 .jj-sr::after { right: 0; }
+.jj-sl.jj-sr::after { left: 0; right: 0; }
+/* A hop over a vertical lane: the lane runs through, the hop sits on top with a gap. */
+.jj-x::before {
+	content: "";
+	position: absolute;
+	left: calc(50% - 1px);
+	width: 2px;
+	top: 0;
+	bottom: 0;
+	background: var(--lane);
+}
+.jj-x::after {
+	z-index: 1;
+	box-shadow: 0 -2px 0 0 var(--panel, var(--card)), 0 2px 0 0 var(--panel, var(--card));
+}
+/* The thin connector from a row's ref pills to its node. */
+.jj-cx {
+	background: linear-gradient(var(--l3), var(--l3)) center / 100% 1px no-repeat;
+}
+/* ...bridging the row's flex gap between the ref column and the graph. */
+.jj-gx::before {
+	content: "";
+	position: absolute;
+	right: 100%;
+	width: 10px;
+	top: 50%;
+	height: 1px;
+	background: var(--l3);
+}
+.jj-cxh {
+	background: linear-gradient(var(--l3), var(--l3)) left center / 50% 1px no-repeat;
+}
+
+/* Nodes */
 .jj-n {
 	position: absolute;
 	z-index: 1;
 	left: 50%;
 	top: 50%;
-	width: 9px;
-	height: 9px;
-	margin: -4.5px 0 0 -4.5px;
-	border-radius: 50%;
 	box-sizing: border-box;
+	transform: translate(-50%, -50%);
+	width: 10px;
+	height: 10px;
+	border-radius: 50%;
 	border: 2px solid var(--lane);
-	background: var(--bg, var(--card));
+	background: var(--panel, var(--card));
+}
+.jj-n.jj-av {
+	width: 19px;
+	height: 19px;
+	border: 2px solid var(--panel, var(--card));
+	box-shadow: 0 0 0 1.5px var(--lane);
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-family: var(--sans);
+	font-size: 8px;
+	font-weight: 700;
+	letter-spacing: 0.02em;
+	color: #fff;
+	background: var(--av);
+}
+.jj-a0 { --av: #3b82f6; }
+.jj-a1 { --av: #db2777; }
+.jj-a2 { --av: #10b981; }
+.jj-a3 { --av: #8b5cf6; }
+.jj-a4 { --av: #0ea5e9; }
+.jj-a5 { --av: #f59e0b; }
+.jj-n-conflict.jj-av {
+	--av: var(--bad-fill, var(--bad));
+	box-shadow: 0 0 0 1.5px var(--bad);
 }
 .jj-n-wc {
-	width: 13px;
-	height: 13px;
-	margin: -6.5px 0 0 -6.5px;
-	border-color: var(--accent);
-	box-shadow: inset 0 0 0 2px var(--bg, var(--card)), inset 0 0 0 6px var(--accent);
+	width: 14px;
+	height: 14px;
+	border: 2px solid var(--accent);
+	box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
+}
+.jj-n-wc::after {
+	content: "";
+	position: absolute;
+	inset: 2px;
+	border-radius: 50%;
+	background: var(--accent);
 }
 .jj-n-immutable {
-	border-radius: 1px;
-	transform: rotate(45deg);
+	width: 10px;
+	height: 10px;
+	border-radius: 2px;
+	transform: translate(-50%, -50%) rotate(45deg);
 	background: var(--lane);
-}
-.jj-n-conflict {
-	border-color: var(--bad, var(--sf-c-error));
-	background: var(--bad, var(--sf-c-error));
+	border-color: var(--lane);
 }
 .jj-n-hidden {
 	border-style: dashed;
+}
+.jj-n-immutable.jj-av {
+	width: 19px;
+	height: 19px;
+	border-radius: 50%;
+	transform: translate(-50%, -50%);
+	border-color: var(--panel, var(--card));
+	background: var(--av);
+	opacity: 0.8;
+}
+
+/* ── Block chrome: toolbar, column header, footer ───────────────────────── */
+.jj-top {
+	position: sticky;
+	top: 0;
+	z-index: 2;
+	background: var(--card);
+	border-bottom: 1px solid var(--l2);
+	font-family: var(--sans);
+}
+.jj-bar-row {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	padding: 6px 10px 6px 8px;
+	font-size: 13px;
+}
+.jj-bar-row .jj-where {
+	display: flex;
+	align-items: center;
+	gap: 6px;
+	color: var(--t1);
+	font-weight: 500;
+	min-width: 0;
+	white-space: nowrap;
+	overflow: hidden;
+	text-overflow: ellipsis;
+}
+.jj-bar-row .jj-sep {
+	width: 1px;
+	height: 16px;
+	background: var(--l2);
+	margin: 0 4px;
+}
+.jj-bar-row .jj-grow {
+	flex: 1;
+}
+.jj-btn {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 26px;
+	height: 24px;
+	border-radius: 6px;
+	color: var(--t2);
+}
+.jj-btn:hover {
+	background: var(--l1);
+	color: var(--t1);
+}
+.jj-btn.jj-busy {
+	color: var(--accent);
+}
+.jj-hd {
+	min-height: 26px;
+	color: var(--t3);
+	font-size: 12px;
+	border-top: 1px solid var(--l1);
+}
+.jj-hd > span {
+	flex: none;
+	white-space: nowrap;
+	overflow: hidden;
+}
+.jj-hd > .jj-hd-msg {
+	flex: 1;
+	padding-left: 13px;
+}
+.jj-foot {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	gap: 6px;
+	padding: 14px 0 18px;
+	color: var(--t3);
+	font-family: var(--sans);
+	font-size: 12px;
+}
+.jj-foot::before {
+	content: "";
+	width: 5px;
+	height: 5px;
+	border-radius: 50%;
+	background: var(--t4);
 }

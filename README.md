@@ -40,8 +40,9 @@ captured by this lens and retain their normal output.
 ### Log lens
 
 `jj` and `jj log` (with any revset or limit) render as a native "Jujutsu log" card:
-the commit graph drawn natively (see below), change ID, flags (conflict, divergent, empty),
-bookmarks and tags, description, author, time and commit ID, one row per change.
+the commit graph drawn natively (see below) with author-initial avatars on the nodes, a lane
+color bar, change ID, flags (conflict, divergent, empty), bookmark and tag pills,
+description, muted date and commit ID, one row per change.
 Click a row to copy its change ID.
 Output in another format (`-T`/`--template`, `--no-graph`, `-p`, `-s`, `--stat`, …),
 errors, and output the lens can't read stay raw.
@@ -51,15 +52,20 @@ errors, and output the lens can't read stay raw.
 Run **Open Jujutsu changes** from the palette (⌥⌘J) in a pane inside a jj repository.
 The block opens beside it, or focuses the one already open in the tab, and shows:
 
-- jj's default log revset (up to 200 changes) as a native commit graph, like Tern's Git
-  block: lanes, forks, merges and elided revisions, with the working copy as a ring,
-  immutable changes as diamonds and conflicts in red. Each row shows the change ID with
-  its unique prefix highlighted, bookmark and tag badges, description, author, age and commit ID.
-- the selected change's summary and files (kind, path, `+`/`−` counts) in the dock.
-- its diff in a full-height sheet (`Enter`, `d`, the Diff button or a double-click), one
+- a toolbar (pinned with the column header while the graph scrolls): the working copy and
+  icon buttons for refresh, fetch (`jj git fetch`), undo, redo, new, edit and diff.
+- jj's default log revset (up to 200 changes) as a native commit graph in the look of Tern's
+  Git block: columns Bookmarks / Graph / Description / Date / Change, bookmark and tag pills
+  on the left joined to their node by a hairline (the bookmark on the working copy is filled),
+  round author-initial avatars on the lanes, a lane-colored bar before the description,
+  muted dates, monospace change IDs with the unique prefix highlighted, a Working copy
+  row with file-count pills, and a footer. Forks, merges and elided revisions follow jj's layout;
+  the working copy is a ring, immutable changes diamonds, conflicts and divergence pills in red.
+- the selected change's summary, files (kind, path, `+`/`−` counts) and key hints in the dock.
+- its diff in a full-height sheet (`Enter`, `d`, the toolbar's diff button or a double-click), one
   collapsible card per file; `↑`/`↓` move to the next change with the sheet open, `Esc` closes it.
 - keys: `↑`/`↓` (or `k`/`j`), `g`/`G`, `@` (jump to the working copy), `n` (`jj new` on the
-  selected change), `e` (`jj edit`), `u` (`jj undo`), `r` (refresh). The dock has buttons for the same operations.
+  selected change), `e` (`jj edit`), `u` (`jj undo`), `r` (refresh). The toolbar has buttons for the same operations.
 
 The graph is jj's own layout (`ui.graph.style=curved`): `graph.luau` reads each graph
 character as strokes from its cell's center, and `jj.css` draws them, so lanes stay

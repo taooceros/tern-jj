@@ -32,6 +32,11 @@ local LOG_TEMPLATE = '"\\x1e" ++ '
 		"local_bookmarks.map(|b| b.name()).join(\" \")",
 		"concat(if(current_working_copy, \"@\"), if(empty, \"e\"), if(conflict, \"c\"), if(immutable, \"i\"), if(divergent, \"d\"))",
 		"tags.map(|t| t.name()).join(\" \")",
+		"if(!root, committer.timestamp().local().format(\"%b %-d\"))",
+		"committer.timestamp().local().format(\"%Y-%m-%d %H:%M\")",
+		-- Only the working copy pays for a diff stat: files, lines added, removed.
+		"if(current_working_copy, self.diff().files().len() ++ \" \" ++ self.diff().stat().total_added() ++ \" \" ++ self.diff().stat().total_removed())",
+		"author.email()",
 	}, ' ++ "\\x1f" ++ ')
 	.. ' ++ "\\n"'
 
@@ -96,6 +101,11 @@ type Change = {
 	bookmarks: string,
 	flags: string,
 	tags: string,
+	date: string,
+	time: string,
+	-- The working copy's `files added removed`, else "".
+	stat: string,
+	email: string,
 }
 
 -- A graph row: a change, an edge row (`├─╮`) or elided revisions (`~`).
@@ -174,7 +184,7 @@ local function parse_log(stdout: string): ({ Row }, { Change })
 		local cells = graph.cells(prefix)
 		if at then
 			local f = string.split(rest, SEP)
-			if #f >= 10 then
+			if #f >= 14 then
 				local change: Change = {
 					commit = f[1],
 					prefix = f[2],
@@ -186,9 +196,23 @@ local function parse_log(stdout: string): ({ Row }, { Change })
 					bookmarks = f[8],
 					flags = f[9],
 					tags = f[10],
+					date = f[11],
+					time = f[12],
+					stat = f[13],
+					email = f[14],
 				}
+				local root = change.date == ""
 				table.insert(changes, change)
-				table.insert(rows, { cells = cells, kind = kind_of(change), change = change, elided = false })
+				local who = if change.author ~= "" then change.author else change.email
+				table.insert(rows, {
+					cells = cells,
+					kind = kind_of(change),
+					label = if root or who == "" then nil else graph.initials(who),
+					avatar = if root then nil else graph.avatar(who),
+					connect = change.bookmarks ~= "" or change.tags ~= "",
+					change = change,
+					elided = false,
+				})
 			end
 		elseif #cells > 0 then
 			table.insert(rows, { cells = cells, kind = nil, change = nil, elided = elided })
@@ -382,14 +406,6 @@ local function operate(state: State, label: string, args: { string })
 	end
 end
 
-local function button(label: string, act: string, tone: string): Node
-	local node = ui.badge(label, tone)
-	local p: { [string]: any } = node.p or {}
-	p.actions = { click = act }
-	node.p = p
-	return node
-end
-
 local function with(node: Node, props: { [string]: any }): Node
 	local p: { [string]: any } = node.p or {}
 	for k, v in props do
@@ -428,48 +444,191 @@ local function description_spans(c: Change): { Span | string }
 	return spans
 end
 
--- One row of the graph: jj's lanes, then the change like a line of `jj log`.
+-- Column widths, in terminal cells, shared by the rows and the column header.
+local REFS_W = "20ch"
+local DATE_W = "7ch"
+local ID_W = "9ch"
+
+local function fixed(w: string): { [string]: any }
+	return { min = { w = w }, max = { w = w } }
+end
+
+local function el(tag: string, props: { [string]: any }, kids: { Node }?): Node
+	return ui.el(tag, props, kids)
+end
+
+local function pill(class: string, icon: string?, label: string, title: string?): Node
+	local kids: { Node } = {}
+	if icon then
+		table.insert(kids, ui.node("icon", { name = icon }))
+	end
+	table.insert(kids, el("span", { text = label }))
+	return el("span", { class = "jj-pill " .. class, title = title }, kids)
+end
+
+-- The ref column: bookmark and tag pills, then the connector toward the node.
+local function refs_view(c: Change): Node
+	local kids: { Node } = {}
+	local here = has(c, "@")
+	for name in string.gmatch(c.bookmarks, "%S+") do
+		table.insert(kids, pill("jj-bm" .. (if here then " jj-here" else ""), if here then "check" else "branch", name))
+	end
+	for name in string.gmatch(c.tags, "%S+") do
+		table.insert(kids, pill("jj-tag", "tag", name))
+	end
+	if #kids > 0 then
+		table.insert(kids, el("span", { class = "jj-cline" }))
+	end
+	local props = fixed(REFS_W)
+	props.class = "jj-refs"
+	return el("div", props, kids)
+end
+
+-- The message column: the lane's color bar, the working copy's pills, then the description.
+local function message_view(row: Row, c: Change): Node
+	local kids: { Node } = { el("span", { class = "jj-bar jj-l" .. graph.lane(row) }) }
+	if has(c, "@") then
+		table.insert(kids, pill("jj-wc", "pen", "Working copy"))
+		local files, adds, dels = string.match(c.stat, "^(%d+) (%d+) (%d+)$")
+		if files and files ~= "0" then
+			table.insert(kids, pill("jj-stat", nil, files .. (if files == "1" then " file" else " files")))
+			table.insert(kids, text({ ui.span("+" .. (adds :: string), "success num"), ui.span(" −" .. (dels :: string), "error num") }, { basis = "content" }))
+		end
+	end
+	if has(c, "c") then
+		table.insert(kids, pill("jj-conf", "warn", "conflict"))
+	end
+	if has(c, "d") then
+		table.insert(kids, pill("jj-conf", "warn", "divergent"))
+	end
+	local desc: { Span | string } = {}
+	if c.description ~= "" then
+		table.insert(desc, ui.span(c.description, if has(c, "i") then "muted" else nil))
+	elseif c.date == "" then
+		table.insert(desc, ui.span("root()", "muted"))
+	else
+		table.insert(desc, ui.span(if has(c, "e") then "(empty)" else "(no description set)", "dim"))
+	end
+	table.insert(kids, text(desc, { grow = 1, truncate = "end" }))
+	return el("div", { class = "jj-msg" }, kids)
+end
+
+local function id_view(c: Change): Node
+	local props = fixed(ID_W)
+	props.class = "jj-id"
+	props.title = c.short
+	return el("span", props, {
+		el("span", { class = "jj-idp", text = c.prefix }),
+		el("span", { text = c.rest }),
+	})
+end
+
+-- One row of the graph, laid out like a row of Tern's Git block.
 local function row_view(state: State, row: Row, i: number, width: number): Node
-	local kids: { Node } = { graph.view(row, width) }
 	local c = row.change
 	if not c then
+		local kids: { Node } = { el("span", fixed(REFS_W)), graph.view(row, width) }
 		if row.elided then
 			table.insert(kids, text({ ui.span("elided revisions", "dim") }, {}))
 		end
-		return ui.el("div", { class = "jj-r jj-edge", key = "e" .. i }, kids)
+		return el("div", { class = "jj-r jj-edge", key = "e" .. i }, kids)
 	end
-	table.insert(kids, text({
-		ui.span(c.prefix, if has(c, "@") then "accent strong" else "accent"),
-		ui.span(c.rest, "dim"),
-	}, { basis = "content" }))
-	for name in string.gmatch(c.bookmarks, "%S+") do
-		table.insert(kids, ui.badge(name, "info"))
-	end
-	for name in string.gmatch(c.tags, "%S+") do
-		table.insert(kids, ui.badge(name, "warning"))
-	end
-	table.insert(kids, text(description_spans(c), { grow = 1, truncate = "end" }))
-	table.insert(kids, text({ ui.span(c.author, "muted") }, { basis = "content", truncate = "end", max = { w = "16ch" } }))
-	table.insert(kids, text({ ui.span(c.ago, "muted") }, { basis = "content" }))
-	table.insert(kids, text({ ui.span(c.short, "info") }, { basis = "content" }))
-	return ui.el("div", {
+	local date = fixed(DATE_W)
+	date.class, date.text, date.title = "jj-date", c.date, if c.time ~= "" then c.time .. " · " .. c.author else nil
+	return el("div", {
 		class = "jj-r jj-pick" .. (if c.commit == state.cursor then " jj-sel" else ""),
 		key = c.commit,
 		actions = { click = "sel=" .. c.commit, dblclick = "open=" .. c.commit },
-	}, kids)
+	}, {
+		refs_view(c),
+		graph.view(row, width),
+		message_view(row, c),
+		el("span", date),
+		id_view(c),
+	})
 end
 
-local function graph_view(state: State): Node
+local function button(icon: string, act: string, title: string, busy: boolean?): Node
+	return el("span", {
+		class = "jj-btn" .. (if busy then " jj-busy" else ""),
+		title = title,
+		actions = { click = act },
+	}, { ui.node("icon", { name = icon }) })
+end
+
+-- The toolbar and column header, pinned to the top of the pane.
+local function top_view(state: State, width: number): Node
+	local where: { Node } = { ui.node("icon", { name = "commit" }) }
+	local all: { Change } = state.changes or {}
+	for _, c in all do
+		if has(c, "@") then
+			table.insert(where, el("span", { text = "@ " .. c.prefix .. c.rest }))
+		end
+	end
+	local status: { Span | string } = {}
+	if state.busy then
+		table.insert(status, ui.span("jj " .. state.busy .. "…", "muted"))
+	elseif state.notice then
+		table.insert(status, ui.span(state.notice.text, state.notice.tone))
+	end
+	local bar: { Node } = {
+		el("span", { class = "jj-where" }, where),
+		button("repeat", "refresh", "Refresh (r)", state.loading),
+		button("fetch", "fetch", "Fetch from remotes (jj git fetch)", state.busy == "git fetch"),
+		el("span", { class = "jj-sep" }),
+		button("undo", "undo", "Undo the last operation (u)"),
+		button("redo", "redo", "Redo"),
+		el("span", { class = "jj-sep" }),
+		button("plus", "new", "New change on the selected one (n)"),
+		button("pen", "edit", "Edit the selected change (e)"),
+		button("diff", "diff", "Show the selected change's diff (⏎)"),
+		el("span", { class = "jj-grow" }),
+		text(status, { truncate = "end", max = { w = 0.5 } }),
+	}
+	local hd = fixed(REFS_W)
+	hd.text = "Bookmarks"
+	local hg = fixed(graph.span(width))
+	hg.text = "Graph"
+	local hdate = fixed(DATE_W)
+	hdate.text = "Date"
+	local hid = fixed(ID_W)
+	hid.text = "Change"
+	return el("div", { class = "jj-top", key = "top" }, {
+		el("div", { class = "jj-bar-row" }, bar),
+		el("div", { class = "jj-r jj-hd" }, {
+			el("span", hd),
+			el("span", hg),
+			el("span", { class = "jj-hd-msg", text = "Description" }),
+			el("span", hdate),
+			el("span", hid),
+		}),
+	})
+end
+
+local function graph_view(state: State): { Node }
+	local width = math.max(graph.width(state.rows), 4)
 	local rows: { Node } = {}
-	local width = graph.width(state.rows)
 	for i, row in state.rows do
 		table.insert(rows, row_view(state, row, i, width))
 	end
-	if #rows == 0 then
-		table.insert(rows, ui.text({ ui.span("No changes in jj's default log revset.", "muted") }))
+	local changes = state.changes or {}
+	local foot: string
+	if #changes == 0 then
+		foot = "No changes in jj's default log revset"
+	elseif #changes >= LIMIT then
+		foot = "Showing the latest " .. LIMIT .. " changes"
+	elseif changes[#changes].date == "" then
+		foot = "Beginning of history · " .. #changes .. " changes"
+	else
+		foot = #changes .. " changes in jj's default log revset"
 	end
-	-- `wrap` keeps every row mounted, so revealing the selection always finds it.
-	return ui.node("col", { key = "graph", gap = "none", wrap = true }, rows)
+	return {
+		-- The pinned bar would paint over the diff sheet, so it is left out while the sheet is open.
+		if state.diff then el("div", { key = "top" }) else top_view(state, width),
+		-- `wrap` keeps every row mounted, so revealing the selection always finds it.
+		ui.node("col", { key = "graph", gap = "none", wrap = true }, rows),
+		el("div", { class = "jj-foot", key = "foot", text = foot }),
+	}
 end
 
 local KIND_TONE = { A = "success", D = "error", R = "warning", M = "warning" }
@@ -557,23 +716,6 @@ local function dock_view(state: State): Node
 			table.insert(lines, text({ ui.span(detail.error, "error") }, { truncate = "end" }))
 		end
 	end
-	local status: { Span | string } = {}
-	if state.busy then
-		table.insert(status, ui.span("jj " .. state.busy .. "…", "muted"))
-	elseif state.notice then
-		table.insert(status, ui.span(state.notice.text, state.notice.tone))
-	elseif state.root then
-		table.insert(status, ui.span(state.root, "muted"))
-	end
-	table.insert(lines, ui.node("spacer", {}))
-	table.insert(lines, ui.row({
-		button("Diff", "diff", "accent"),
-		button("New", "new", "neutral"),
-		button("Edit", "edit", "neutral"),
-		button("Undo", "undo", "neutral"),
-		button("Refresh", "refresh", "neutral"),
-		with(ui.text(status), { grow = 1, truncate = "end" }),
-	}))
 	table.insert(lines, ui.text({ ui.span("↑↓ move  ⏎ diff  @ working copy  n new  e edit  u undo  r refresh", "dim") }))
 	return ui.col({ ui.lines(lines) })
 end
@@ -605,6 +747,10 @@ local function act(state: State, name: string, value: string?): boolean
 		refresh(state)
 	elseif name == "undo" then
 		operate(state, "undo", { "undo" })
+	elseif name == "redo" then
+		operate(state, "redo", { "redo" })
+	elseif name == "fetch" then
+		operate(state, "git fetch", { "git", "fetch" })
 	elseif name == "new" and change then
 		operate(state, "new", { "new", change.commit })
 	elseif name == "edit" and change then
@@ -651,7 +797,7 @@ local block: BlockDef<State> = {
 				local card = ui.card({ ui.span("Jujutsu", "strong") }, {
 					ui.text({ ui.span(state.problem, "error") }),
 					ui.text({ ui.span(state.cwd or "", "muted") }),
-					ui.row({ button("Retry", "refresh", "accent") }),
+					ui.row({ with(ui.badge("Retry", "accent"), { actions = { click = "refresh" } }) }),
 				})
 				return { main = ui.col({ with(card, { tone = "error" }) }) }
 			end
@@ -659,7 +805,7 @@ local block: BlockDef<State> = {
 		end
 		local change = selected(state)
 		return {
-			main = ui.col({ graph_view(state) }),
+			main = ui.col(graph_view(state)),
 			dock = dock_view(state),
 			layer = if state.diff and change then diff_layer(state, change) else nil,
 		}
