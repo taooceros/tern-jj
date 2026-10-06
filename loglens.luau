@@ -256,7 +256,9 @@ local function view(state: State): Node?
 	if state.more > 0 then
 		table.insert(lines, ui.overflow(state.more))
 	end
-	return ui.card("Jujutsu log", { ui.lines(lines) })
+	-- `wrap` turns off Tern's column virtualization: past about three viewports it
+	-- mounts only rows near the viewport, so the card started mid-log and jumped on click.
+	return ui.card("Jujutsu log", { ui.node("col", { gap = "none", wrap = true }, lines) })
 end
 
 local lens: LensDef<State> = {
