@@ -53,7 +53,9 @@ Run **Open Jujutsu changes** from the palette (⌥⌘J) in a pane inside a jj re
 The block opens beside it, or focuses the one already open in the tab, and shows:
 
 - a toolbar (pinned with the column header while the graph scrolls): the working copy and
-  icon buttons for refresh, fetch (`jj git fetch`), undo, redo, new, edit and diff.
+  icon buttons for refresh, fetch (`jj git fetch`), undo, redo, new, edit and diff. In a pane
+  too narrow for the columns (or for a wide graph), the rows and the column header scroll
+  sideways together, as in Tern's Git block; the toolbar and the dock stay put.
 - jj's default log revset (up to 200 changes) as a native commit graph in the look of Tern's
   Git block: columns Bookmarks / Graph / Description / Date / Change, bookmark and tag pills
   on the left joined to their node by a hairline (the bookmark on the working copy is filled),

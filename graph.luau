@@ -74,13 +74,15 @@ function M.initials(name: string): string
 	return "?"
 end
 
--- A stable avatar color (0–5) for an author.
+-- A stable avatar color (0–7) for an author: FNV-1a over the name.
 function M.avatar(name: string): number
-	local h = 0
+	local h = 2166136261
 	for i = 1, #name do
-		h = (h * 31 + string.byte(name, i)) % 997
+		h = bit32.bxor(h, string.byte(name, i))
+		-- h * 16777619 mod 2^32, split so every product stays exact in a double.
+		h = ((h % 256) * 16777216 + h * 403) % 4294967296
 	end
-	return h % 6
+	return (h // 8) % 8
 end
 
 -- The lane (0-based) of the row's node, for coloring the row's message bar.

@@ -51,12 +51,16 @@
 	min-width: 6px;
 	background: linear-gradient(var(--l3), var(--l3)) center / 100% 1px no-repeat;
 }
+/* Spare width goes to the description; its `min` (set by the block) is the floor below
+   which the rows scroll sideways. `width: 0` keeps long text out of the row's minimum. */
 .jj-msg {
 	display: flex;
 	align-items: center;
 	gap: 8px;
-	flex: 1;
+	flex: 1 1 0;
+	width: 0;
 	min-width: 0;
+	overflow: clip;
 }
 .jj-bar {
 	flex: none;
@@ -240,6 +244,8 @@
 .jj-a3 { --av: #8b5cf6; }
 .jj-a4 { --av: #0ea5e9; }
 .jj-a5 { --av: #f59e0b; }
+.jj-a6 { --av: #0d9488; }
+.jj-a7 { --av: #dc2626; }
 .jj-n-conflict.jj-av {
 	--av: var(--bad-fill, var(--bad));
 	box-shadow: 0 0 0 1.5px var(--bad);
@@ -275,19 +281,44 @@
 	transform: translate(-50%, -50%);
 	border-color: var(--panel, var(--card));
 	background: var(--av);
-	opacity: 0.8;
+	border: 2px dashed var(--lane);
+	background-clip: padding-box;
 }
 
 /* ── Block chrome: toolbar, column header, footer ───────────────────────── */
+/* `main` scrolls both ways; nothing inside it scrolls. Its own stacking context keeps the
+   pinned toolbar's z-index under the diff sheet in `layer`. No padding: the toolbar pins
+   where it sits (a top padding would make it jump on the first scroll). A revealed row
+   stops below the 63px toolbar+header, not under it. */
+.sf-main[data-surface='plugin.jj.changes'] {
+	overflow-x: auto;
+	isolation: isolate;
+	scroll-padding-top: 69px;
+	padding: 0 0 6px !important;
+	gap: 0 !important;
+}
+/* The toolbar+header and the rows+footer: as wide as a row's columns at their minimum
+   (the description's `min`), at least the pane, so both scroll sideways together. */
+.sf-main[data-surface='plugin.jj.changes'] > .jj-top,
+.sf-main[data-surface='plugin.jj.changes'] > [data-role='jj.rows'] {
+	width: max-content;
+	min-width: 100%;
+}
+.sf-main[data-surface='plugin.jj.changes'] > [data-role='jj.rows'] {
+	padding-top: 6px;
+}
 .jj-top {
 	position: sticky;
 	top: 0;
 	z-index: 2;
-	background: var(--card);
+	background: var(--tv-bg, var(--card));
 	border-bottom: 1px solid var(--l2);
 	font-family: var(--sans);
 }
+/* Capped at the pane's width by the block, it stays put while the rows scroll sideways. */
 .jj-bar-row {
+	position: sticky;
+	left: 0;
 	display: flex;
 	align-items: center;
 	gap: 6px;
@@ -339,11 +370,14 @@
 .jj-hd > span {
 	flex: none;
 	white-space: nowrap;
-	overflow: hidden;
+	overflow: clip;
 }
+/* Sized like `.jj-msg`; the label starts where the descriptions do, past the lane bar. */
 .jj-hd > .jj-hd-msg {
-	flex: 1;
-	padding-left: 13px;
+	flex: 1 1 0;
+	width: 0;
+	box-sizing: border-box;
+	padding-left: 11px;
 }
 .jj-foot {
 	display: flex;
@@ -361,4 +395,12 @@
 	height: 5px;
 	border-radius: 50%;
 	background: var(--t4);
+}
+
+/* The dock lines start where the rows' content does. */
+.jj-dock {
+	display: flex;
+	flex-direction: column;
+	padding: 0 10px 0 6px;
+	min-width: 0;
 }

@@ -444,8 +444,10 @@ local function description_spans(c: Change): { Span | string }
 	return spans
 end
 
--- Column widths, in terminal cells, shared by the rows and the column header.
+-- Column widths, in terminal cells, shared by the rows and the column header. The description
+-- column takes the spare width but never less than MSG_W: below that the rows scroll sideways.
 local REFS_W = "20ch"
+local MSG_W = "22ch"
 local DATE_W = "7ch"
 local ID_W = "9ch"
 
@@ -510,7 +512,7 @@ local function message_view(row: Row, c: Change): Node
 		table.insert(desc, ui.span(if has(c, "e") then "(empty)" else "(no description set)", "dim"))
 	end
 	table.insert(kids, text(desc, { grow = 1, truncate = "end" }))
-	return el("div", { class = "jj-msg" }, kids)
+	return el("div", { class = "jj-msg", min = { w = MSG_W } }, kids)
 end
 
 local function id_view(c: Change): Node
@@ -556,7 +558,8 @@ local function button(icon: string, act: string, title: string, busy: boolean?):
 	}, { ui.node("icon", { name = icon }) })
 end
 
--- The toolbar and column header, pinned to the top of the pane.
+-- The toolbar and column header, pinned to the top of the pane. The header scrolls sideways
+-- with the rows; the toolbar, capped at the pane's width, stays put.
 local function top_view(state: State, width: number): Node
 	local where: { Node } = { ui.node("icon", { name = "commit" }) }
 	local all: { Change } = state.changes or {}
@@ -594,11 +597,11 @@ local function top_view(state: State, width: number): Node
 	local hid = fixed(ID_W)
 	hid.text = "Change"
 	return el("div", { class = "jj-top", key = "top" }, {
-		el("div", { class = "jj-bar-row" }, bar),
+		el("div", { class = "jj-bar-row", max = { w = state.cx.cols .. "ch" } }, bar),
 		el("div", { class = "jj-r jj-hd" }, {
 			el("span", hd),
 			el("span", hg),
-			el("span", { class = "jj-hd-msg", text = "Description" }),
+			el("span", { class = "jj-hd-msg", text = "Description", min = { w = MSG_W } }),
 			el("span", hdate),
 			el("span", hid),
 		}),
@@ -622,12 +625,12 @@ local function graph_view(state: State): { Node }
 	else
 		foot = #changes .. " changes in jj's default log revset"
 	end
+	table.insert(rows, el("div", { class = "jj-foot", key = "foot", text = foot }))
 	return {
-		-- The pinned bar would paint over the diff sheet, so it is left out while the sheet is open.
-		if state.diff then el("div", { key = "top" }) else top_view(state, width),
-		-- `wrap` keeps every row mounted, so revealing the selection always finds it.
-		ui.node("col", { key = "graph", gap = "none", wrap = true }, rows),
-		el("div", { class = "jj-foot", key = "foot", text = foot }),
+		top_view(state, width),
+		-- `wrap` keeps every row mounted, so revealing the selection always finds it. The rows
+		-- and the footer share the widest row's width, so the pane scrolls them sideways together.
+		ui.node("col", { key = "graph", role = "jj.rows", gap = "none", wrap = true }, rows),
 	}
 end
 
@@ -717,7 +720,7 @@ local function dock_view(state: State): Node
 		end
 	end
 	table.insert(lines, ui.text({ ui.span("↑↓ move  ⏎ diff  @ working copy  n new  e edit  u undo  r refresh", "dim") }))
-	return ui.col({ ui.lines(lines) })
+	return ui.col({ ui.el("div", { class = "jj-dock" }, lines) })
 end
 
 -- Selects change `n` and scrolls its row into view.
