@@ -41,6 +41,10 @@ local LOG_TEMPLATE = '"\\x1e" ++ '
 		-- Only the working copy pays for a diff stat: files, lines added, removed.
 		"if(current_working_copy, self.diff().files().len() ++ \" \" ++ self.diff().stat().total_added() ++ \" \" ++ self.diff().stat().total_removed())",
 		"author.email()",
+		-- Co-authors from `Co-authored-by: Name <email>` trailers, and the authors of the
+		-- parents a merge brings in, each `name\x1cemail`, joined by \x1d.
+		'trailers.filter(|t| t.key().lower() == "co-authored-by").map(|t| t.value()).join("\\x1d")',
+		'parents.map(|p| p.author().name() ++ "\\x1c" ++ p.author().email()).join("\\x1d")',
 	}, ' ++ "\\x1f" ++ ')
 	.. ' ++ "\\n"'
 
@@ -94,6 +98,41 @@ local function jj(args: { string }, cwd: string?, done: (ProcessResult) -> ()): 
 	return last
 end
 
+type Person = { name: string, email: string }
+
+-- The change's people (see `Change.people`) from the author and the template's co-author
+-- and parent fields.
+local function people_of(name: string, email: string, coauthors: string, parents: string): { Person }
+	local people: { Person } = {}
+	local seen: { [string]: boolean } = {}
+	local function add(n: string, e: string)
+		n, e = (string.gsub(n, "^%s+", "")), (string.gsub(e, "^%s+", ""))
+		n, e = (string.gsub(n, "%s+$", "")), (string.gsub(e, "%s+$", ""))
+		local key = string.lower(if e ~= "" then e else n)
+		if key ~= "" and not seen[key] then
+			seen[key] = true
+			table.insert(people, { name = n, email = e })
+		end
+	end
+	add(name, email)
+	for _, value in string.split(coauthors, "\x1d") do
+		local n, e = string.match(value, "^(.-)%s*<([^>]*)>%s*$")
+		if n and e then
+			add(n, e)
+		elseif value ~= "" then
+			add(value, "")
+		end
+	end
+	local list = string.split(parents, "\x1d")
+	for n = 2, #list do
+		local pn, pe = string.match(list[n], "^(.-)\x1c(.*)$")
+		if pn and pe then
+			add(pn, pe)
+		end
+	end
+	return people
+end
+
 type Change = {
 	commit: string,
 	prefix: string,
@@ -101,6 +140,11 @@ type Change = {
 	short: string,
 	description: string,
 	author: string,
+	-- Everyone who wrote the change: its author, its co-authors, and the authors of the
+	-- parents a merge brings in (all but the first), each once.
+	people: { Person },
+	-- Their names, joined: the author alone for a change by one person.
+	names: string,
 	ago: string,
 	bookmarks: string,
 	flags: string,
@@ -190,7 +234,12 @@ local function parse_log(stdout: string): ({ Row }, { Change })
 		local cells = graph.cells(prefix)
 		if at then
 			local f = string.split(rest, SEP)
-			if #f >= 14 then
+			if #f >= 16 then
+				local people = people_of(f[6], f[14], f[15], f[16])
+				local names: { string } = {}
+				for _, p in people do
+					table.insert(names, if p.name ~= "" then p.name else p.email)
+				end
 				local change: Change = {
 					commit = f[1],
 					prefix = f[2],
@@ -198,6 +247,8 @@ local function parse_log(stdout: string): ({ Row }, { Change })
 					short = f[4],
 					description = f[5],
 					author = f[6],
+					people = people,
+					names = table.concat(names, ", "),
 					ago = f[7],
 					bookmarks = f[8],
 					flags = f[9],
@@ -213,7 +264,8 @@ local function parse_log(stdout: string): ({ Row }, { Change })
 				table.insert(rows, {
 					cells = cells,
 					kind = kind_of(change),
-					author = if root then nil else who,
+					-- The whole team: a change by the same people as the one above is a dot.
+					author = if root then nil else change.names,
 					label = if root or who == "" then nil else graph.initials(who),
 					avatar = if root then nil else graph.avatar(who),
 					connect = change.bookmarks ~= "" or change.tags ~= "",
@@ -323,21 +375,29 @@ local function load_detail(state: State)
 	end
 end
 
--- Asks for the GitHub avatar of every author not seen yet; each one that arrives is sent
--- to the block as a blob and redraws it.
+-- Asks for the GitHub avatar of everyone not seen yet; each one that arrives is sent to the
+-- block as a blob and redraws it.
 local function load_photos(state: State)
 	for _, c in state.changes or {} do
-		local email = string.lower(c.email)
-		if email ~= "" and state.photos[email] == nil then
-			state.photos[email] = ""
-			avatars.load(email, function(image)
-				if alive(state) then
-					state.photos[email] = state.cx:blob(image.bytes, image.mime)
-					state.cx:render()
-				end
-			end)
+		for _, p in c.people do
+			local email = string.lower(p.email)
+			if email ~= "" and state.photos[email] == nil then
+				state.photos[email] = ""
+				avatars.load(email, function(image)
+					if alive(state) then
+						state.photos[email] = state.cx:blob(image.bytes, image.mime)
+						state.cx:render()
+					end
+				end)
+			end
 		end
 	end
+end
+
+-- A person's GitHub avatar blob, when it has arrived.
+local function photo_of(state: State, p: Person): string?
+	local photo = if p.email ~= "" then state.photos[string.lower(p.email)] else nil
+	return if photo ~= "" then photo else nil
 end
 
 -- Reloads the list, keeping the cursor on the same commit when it still exists,
@@ -561,10 +621,16 @@ local function row_view(state: State, row: Row, i: number, width: number): Node
 		return el("div", { class = "jj-r jj-edge", key = "e" .. i }, kids)
 	end
 	local date = fixed(DATE_W)
-	date.class, date.text, date.title = "jj-date", c.date, if c.time ~= "" then c.time .. " · " .. c.author else nil
+	date.class, date.text, date.title = "jj-date", c.date, if c.time ~= "" then c.time .. " · " .. c.names else nil
 	local pick = { click = "sel=" .. c.commit, dblclick = "open=" .. c.commit }
-	local photo = if c.email ~= "" then state.photos[string.lower(c.email)] else nil
-	row.photo = if photo ~= "" then photo else nil
+	row.photo = if c.people[1] then photo_of(state, c.people[1]) else nil
+	local extra: { graph.Face } = {}
+	for n = 2, #c.people do
+		local p = c.people[n]
+		local who = if p.name ~= "" then p.name else p.email
+		table.insert(extra, { name = who, label = graph.initials(who), avatar = graph.avatar(who), photo = photo_of(state, p) })
+	end
+	row.extra = extra
 	row.pick = pick
 	return el("div", {
 		class = "jj-r jj-pick" .. (if c.commit == state.cursor then " jj-sel" else ""),
@@ -729,8 +795,8 @@ local function dock_view(state: State): Node
 			ui.span(c.rest .. "  ", "dim"),
 			ui.span(c.short .. "  ", "info"),
 		}
-		if c.author ~= "" then
-			table.insert(head, ui.span(c.author .. " · " .. c.ago .. "  ", "muted"))
+		if c.names ~= "" then
+			table.insert(head, ui.span(c.names .. " · " .. c.ago .. "  ", "muted"))
 		end
 		for _, s in description_spans(c) do
 			table.insert(head, s)

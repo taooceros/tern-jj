@@ -41,6 +41,9 @@ local GLYPH_KIND: { [string]: string } = {
 -- past a corner).
 export type Cell = { glyph: string, strokes: string, node: boolean, elided: boolean, cross: boolean?, lane: number?, turn: string? }
 
+-- Another author of a change: their name, initials, avatar color and GitHub picture.
+export type Face = { name: string, label: string, avatar: number, photo: string? }
+
 -- A graph row: its cells; for a change, the node's kind, its author, the avatar's
 -- initials and color, and whether a ref pill on the left connects to the node.
 -- `dot` (set by `link`/`layout`) draws the node as a filled dot instead of an avatar.
@@ -56,6 +59,8 @@ export type GraphRow = {
 	dot: boolean?,
 	photo: string?,
 	pick: { [string]: string }?,
+	-- Everyone else who wrote the change (co-authors, a merge's other authors), block only.
+	extra: { Face }?,
 	-- Set by `link` on a junction row it moved onto a node: draw nothing for it.
 	hidden: boolean?,
 }
@@ -489,13 +494,36 @@ local function node(row: GraphRow): Node
 	end
 	local label = row.label
 	if label and kind ~= "wc" then
+		local kids: { Node } = {}
 		local photo = row.photo
 		if photo then
-			return ui.el("span", { class = class .. " jj-av jj-ph" }, {
+			class ..= " jj-ph"
+			table.insert(kids, ui.el("span", { class = "jj-clip" }, {
 				ui.node("image", { blob = photo, alt = row.author, w = 15, h = 15, role = "jj-face", actions = row.pick }),
-			})
+			}))
 		end
-		return ui.el("span", { class = class .. " jj-av", text = label })
+		-- Everyone else who wrote it: one more face on the avatar's corner, or their count.
+		local extra = row.extra or {}
+		if #extra == 1 then
+			local f = extra[1]
+			local fp = f.photo
+			if fp then
+				table.insert(kids, ui.el("span", { class = "jj-co jj-ph" }, {
+					ui.el("span", { class = "jj-clip" }, {
+						ui.node("image", { blob = fp, alt = f.name, w = 9, h = 9, role = "jj-face", actions = row.pick }),
+					}),
+				}))
+			else
+				table.insert(kids, ui.el("span", { class = "jj-co jj-a" .. f.avatar, text = string.sub(f.label, 1, 1) }))
+			end
+		elseif #extra > 1 then
+			table.insert(kids, ui.el("span", { class = "jj-co jj-co-n", text = "+" .. #extra }))
+		end
+		return ui.el("span", {
+			class = class .. " jj-av",
+			text = if photo then nil else label,
+			title = row.author,
+		}, kids)
 	end
 	return ui.el("span", { class = class })
 end

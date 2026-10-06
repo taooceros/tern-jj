@@ -59,9 +59,12 @@ The block opens beside it, or focuses the one already open in the tab, and shows
 - every visible change (`jj log -r 'all()'`, the latest 200), not just jj's default log revset, as a native commit graph in the look of Tern's
   Git block: columns Bookmarks / Graph / Description / Date / Change, bookmark and tag pills
   on the left joined to their node by a hairline (the bookmark on the working copy is filled),
-  round avatars on the lanes where the author changes and at the top of every branch, dots for
+  round avatars on the lanes where the authors change and at the top of every branch, dots for
   the rest; an avatar shows the author's GitHub picture when GitHub knows their email, else
-  their initials. A lane-colored bar before the description,
+  their initials. A change with several authors (`Co-authored-by:` trailers, or a merge
+  whose other parents are by someone else) adds a small badge on the avatar's corner: the
+  other author's face or initial, or `+N` for several; hovering the avatar and the dock list
+  everyone. A lane-colored bar before the description,
   muted dates, monospace change IDs with the unique prefix highlighted, a Working copy
   row with file-count pills, and a footer. Forks, merges and elided revisions follow jj's layout;
   the working copy is a ring, immutable changes diamonds, conflicts and divergence pills in red.
