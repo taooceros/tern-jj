@@ -168,6 +168,13 @@
    above the node on `::before`, below it on `::after` (a node cell has no horizontal stroke). */
 .jj-nw { --jj-gap: 6px; }
 .jj-nr { --jj-gap: 4px; }
+/* A merge: a larger hollow ring, as in Tern's Git block. */
+.jj-nm { --jj-gap: 6px; }
+.jj-n.jj-merge {
+	width: 13px;
+	height: 13px;
+	border-width: 2.5px;
+}
 .jj-nw.jj-sb::before,
 .jj-nr.jj-sb::before { top: calc(50% + var(--jj-gap)); }
 .jj-nw.jj-st::before,
