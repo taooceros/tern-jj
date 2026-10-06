@@ -22,8 +22,9 @@ local ROW_ID = "main.graph."
 local MAX_DIFF_BYTES = 512 * 1024
 local SUMMARY_FILES = 6
 
--- jj draws the graph; each change's record follows its node glyph after \x1e,
--- with fields joined by \x1f, so descriptions and names never need escaping.
+-- One record per change after \x1e, past jj's graph prefix (the block lays the graph out from
+-- the parents' commit ids itself), with fields joined by \x1f, so descriptions and names never
+-- need escaping.
 local LOG_TEMPLATE = '"\\x1e" ++ '
 	.. table.concat({
 		"commit_id",
@@ -45,6 +46,7 @@ local LOG_TEMPLATE = '"\\x1e" ++ '
 		-- parents a merge brings in, each `name\x1cemail`, joined by \x1d.
 		'trailers.filter(|t| t.key().lower() == "co-authored-by").map(|t| t.value()).join("\\x1d")',
 		'parents.map(|p| p.author().name() ++ "\\x1c" ++ p.author().email()).join("\\x1d")',
+		'parents.map(|p| p.commit_id()).join(" ")',
 	}, ' ++ "\\x1f" ++ ')
 	.. ' ++ "\\n"'
 
@@ -156,8 +158,8 @@ type Change = {
 	email: string,
 }
 
--- A graph row: a change, an edge row (`├─╮`) or elided revisions (`~`).
-type Row = graph.GraphRow & { change: Change?, elided: boolean }
+-- A row of the graph: one change.
+type Row = graph.GraphRow & { change: Change }
 
 type FileDiff = {
 	path: string,
@@ -219,62 +221,53 @@ local function kind_of(change: Change): string
 		else "node"
 end
 
--- The graph rows and changes of `jj log -T LOG_TEMPLATE` output.
+-- The graph rows and changes of `jj log -T LOG_TEMPLATE` output (jj's graph prefixes and
+-- edge lines are skipped).
 local function parse_log(stdout: string): ({ Row }, { Change })
 	local rows: { Row } = {}
 	local changes: { Change } = {}
 	for line in string.gmatch(stdout, "([^\n]*)\n?") do
 		local at = string.find(line, REC, 1, true)
-		local prefix = if at then string.sub(line, 1, at - 1) else line
-		local rest = if at then string.sub(line, at + 1) else ""
-		local elided = not at and string.find(line, "(elided revisions)", 1, true) ~= nil
-		if elided then
-			prefix = string.sub(line, 1, (string.find(line, "(elided revisions)", 1, true) :: number) - 1)
-		end
-		local cells = graph.cells(prefix)
-		if at then
-			local f = string.split(rest, SEP)
-			if #f >= 16 then
-				local people = people_of(f[6], f[14], f[15], f[16])
-				local names: { string } = {}
-				for _, p in people do
-					table.insert(names, if p.name ~= "" then p.name else p.email)
-				end
-				local change: Change = {
-					commit = f[1],
-					prefix = f[2],
-					rest = f[3],
-					short = f[4],
-					description = f[5],
-					author = f[6],
-					people = people,
-					names = table.concat(names, ", "),
-					ago = f[7],
-					bookmarks = f[8],
-					flags = f[9],
-					tags = f[10],
-					date = f[11],
-					time = f[12],
-					stat = f[13],
-					email = f[14],
-				}
-				local root = change.date == ""
-				table.insert(changes, change)
-				local who = if change.author ~= "" then change.author else change.email
-				table.insert(rows, {
-					cells = cells,
-					kind = kind_of(change),
-					-- The whole team: a change by the same people as the one above is a dot.
-					author = if root then nil else change.names,
-					label = if root or who == "" then nil else graph.initials(who),
-					avatar = if root then nil else graph.avatar(if change.email ~= "" then string.lower(change.email) else who),
-					connect = change.bookmarks ~= "" or change.tags ~= "",
-					change = change,
-					elided = false,
-				})
+		local f = if at then string.split(string.sub(line, at + 1), SEP) else {}
+		if #f >= 17 then
+			local people = people_of(f[6], f[14], f[15], f[16])
+			local names: { string } = {}
+			for _, p in people do
+				table.insert(names, if p.name ~= "" then p.name else p.email)
 			end
-		elseif #cells > 0 then
-			table.insert(rows, { cells = cells, kind = nil, change = nil, elided = elided })
+			local change: Change = {
+				commit = f[1],
+				prefix = f[2],
+				rest = f[3],
+				short = f[4],
+				description = f[5],
+				author = f[6],
+				people = people,
+				names = table.concat(names, ", "),
+				ago = f[7],
+				bookmarks = f[8],
+				flags = f[9],
+				tags = f[10],
+				date = f[11],
+				time = f[12],
+				stat = f[13],
+				email = f[14],
+			}
+			local root = change.date == ""
+			table.insert(changes, change)
+			local who = if change.author ~= "" then change.author else change.email
+			table.insert(rows, {
+				cells = {},
+				id = change.commit,
+				parents = if f[17] ~= "" then string.split(f[17], " ") else {},
+				kind = kind_of(change),
+				-- The whole team: a change by the same people as the one above is a dot.
+				author = if root then nil else change.names,
+				label = if root or who == "" then nil else graph.initials(who),
+				avatar = if root then nil else graph.avatar(if change.email ~= "" then string.lower(change.email) else who),
+				connect = change.bookmarks ~= "" or change.tags ~= "",
+				change = change,
+			})
 		end
 	end
 	graph.layout(rows)
@@ -408,7 +401,9 @@ local function refresh(state: State)
 	end
 	state.loading = true
 	local function load_log()
-		local args = { "log", "-r", REVSET, "--config", "ui.graph.style=curved", "--limit", tostring(LIMIT), "-T", LOG_TEMPLATE }
+		-- jj's graph for its order (each branch kept together), not its glyphs: `layout` draws
+		-- from the parents.
+		local args = { "log", "-r", REVSET, "--limit", tostring(LIMIT), "-T", LOG_TEMPLATE }
 		local spawn_error = jj(args, state.root, function(result)
 			if not alive(state) then
 				return
@@ -611,15 +606,8 @@ local function id_view(c: Change): Node
 end
 
 -- One row of the graph, laid out like a row of Tern's Git block.
-local function row_view(state: State, row: Row, i: number, width: number): Node
+local function row_view(state: State, row: Row, width: number): Node
 	local c = row.change
-	if not c then
-		local kids: { Node } = { el("span", fixed(REFS_W)), graph.view(row, width) }
-		if row.elided then
-			table.insert(kids, text({ ui.span("elided revisions", "dim") }, {}))
-		end
-		return el("div", { class = "jj-r jj-edge", key = "e" .. i }, kids)
-	end
 	local date = fixed(DATE_W)
 	date.class, date.text, date.title = "jj-date", c.date, if c.time ~= "" then c.time .. " · " .. c.names else nil
 	local pick = { click = "sel=" .. c.commit, dblclick = "open=" .. c.commit }
@@ -707,10 +695,8 @@ end
 local function graph_view(state: State): { Node }
 	local width = math.max(graph.width(state.rows), 4)
 	local rows: { Node } = {}
-	for i, row in state.rows do
-		if not row.hidden then
-			table.insert(rows, row_view(state, row, i, width))
-		end
+	for _, row in state.rows do
+		table.insert(rows, row_view(state, row, width))
 	end
 	local changes = state.changes or {}
 	local foot: string

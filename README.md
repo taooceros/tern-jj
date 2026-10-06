@@ -73,8 +73,9 @@ The block opens beside it, or focuses the one already open in the tab, and shows
   everyone (for a merge, the dock lists its author and those of the parents it brings in).
   A lane-colored bar before the description,
   muted dates, monospace change IDs with the unique prefix highlighted, a Working copy
-  row with file-count pills, and a footer. Forks, merges and elided revisions follow jj's layout;
-  the working copy is a ring, immutable changes diamonds, conflicts and divergence pills in red.
+  row with file-count pills, and a footer. The rows keep jj's order; the working copy is a
+  ring, immutable changes diamonds (dots too, where the author doesn't change), conflicts and
+  divergence pills in red.
 - the selected change's summary, files (kind, path, `+`/`−` counts) and key hints in the dock.
 - its diff in a full-height sheet (`Enter`, `d`, the toolbar's diff button or a double-click), one
   collapsible card per file; `↑`/`↓` move to the next change with the sheet open, `Esc` closes it.
@@ -86,9 +87,11 @@ character as strokes from its cell's center, and `jj.css` draws them, so lanes s
 continuous whatever the row height. A branch leaves its lane at a right angle and turns in one
 curve into the lane it joins: from the side of the change's node when the fork or merge is next
 to it, else from a dot on the lane. The Jujutsu block lays the lanes out itself, as Tern's Git
-block does: it follows jj's strokes to find each change's parents, keeps every edge on its own
-lane down to its parent, and turns it into the parent's row there, so a parent's children stem
-from it at different lengths and jj's junction rows go away.
+block does, from each change's parents (their commit IDs, from the log template, not jj's
+drawing, whose curved glyphs can drop a lane): every edge keeps its own lane down to its parent
+and turns into the parent's row there, so a parent's children stem from it at different
+lengths. A run that crosses a lane is drawn over it in its own color. Every stroke, ring and
+avatar border is as wide as the lanes.
 
 Every operation is a plain `jj` command, so `u` reverts any of them. The block reloads
 after every `jj` command that finishes in a Tern pane. Outside a repository it shows
