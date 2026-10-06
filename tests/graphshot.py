@@ -38,23 +38,29 @@ with tempfile.TemporaryDirectory(prefix="tern-jj-graph-", dir="/tmp") as tempora
         subprocess.run(["jj", *args], cwd=repo, env=env, check=True, capture_output=True)
 
     # @  top / ○ merge / ├─╮ / │ ○ left 2 / │ ○ left / ○ │ right / ├─╯ / │ ○ side / ├─╯ /
-    # │ ○ ada / ├─╯ / ○ base. Ada Lovelace has no GitHub account (initials, no photo); the rest
-    # are by the jj user (a GitHub photo when their email has one). Several authors: `left` is
-    # co-authored by Ada and Bob (+2), `side` by Ada (her initial), and `merge` brings in
-    # `left 2`, by Ada (her initial on the jj user's avatar).
+    # ○ ada (a merge of base and trunk 1) / ○ low / … / ○ base / ○ trunk 2 / ○ trunk 1: ada's
+    # lane down to trunk 1 crosses the run from low into base. Ada Lovelace has no GitHub
+    # account (initials, no photo); the rest are by the jj user (a GitHub photo when their email
+    # has one). Several authors: `left` is co-authored by Ada and Bob (+2), `side` by Ada (her
+    # initial). `merge` and its ancestors are immutable: trunk 1 and 2 are diamond dots, merge a
+    # ring.
     ada = ["--config", "user.name=Ada Lovelace", "--config", "user.email=ada@tern-jj.invalid"]
     subprocess.run(["jj", "git", "init", "--no-colocate", str(repo)], check=True, env=env,
                    capture_output=True)
-    jj("describe", "-m", "base")
+    jj("describe", "-m", "trunk 1")
+    jj("new", "-m", "trunk 2")
+    jj("new", "-m", "base")
     jj("new", "-m", "left\n\nCo-authored-by: Ada Lovelace <ada@tern-jj.invalid>\n"
        "Co-authored-by: Bob <bob@tern-jj.invalid>")
     jj("new", "-m", "left 2", *ada)
     jj("new", "@--", "-m", "right")
     jj("new", "@", "description(glob:'left 2*')", "-m", "merge")
-    jj("new", "description(glob:'base*')", "-m", "ada", *ada)
+    jj("new", "description(glob:'base*')", "-m", "low")
+    jj("new", "description(glob:'base*')", "description(glob:'trunk 1*')", "-m", "ada", *ada)
     jj("new", "description(glob:'base*')", "-m",
        "side\n\nCo-authored-by: Ada Lovelace <ada@tern-jj.invalid>")
     jj("new", "description(glob:'merge*')", "-m", "top")
+    jj("config", "set", "--repo", 'revset-aliases."immutable_heads()"', "description(glob:'merge*')")
 
     package = work / "package"
     package.mkdir()
@@ -115,6 +121,9 @@ with tempfile.TemporaryDirectory(prefix="tern-jj-graph-", dir="/tmp") as tempora
         print("photos", len(ctl(f"tree {SURFACE} .jj-ph")["nodes"]), "initials", initials)
         badges = [n.get("text") or "photo" for n in ctl(f"tree {SURFACE} .jj-co")["nodes"]]
         print("co-author badges", badges)
+        for name, selector in (("merge rings", ".jj-merge"), ("dots", ".jj-dot"),
+                               ("crossings", ".jj-x")):
+            print(name, len(ctl(f"tree {SURFACE} {selector}")["nodes"]))
         time.sleep(0.5)
         png = ctl("shot graph")["png"]
     finally:
