@@ -124,8 +124,8 @@ with tempfile.TemporaryDirectory(prefix="tern-jj-", dir="/tmp") as temporary:
 
             ctl("key alt+cmd+j")
             surface = "[data-surface='plugin.jj.changes']"
-            wait_text(f".sf-main{surface} .jj6-r", "(no description set)")
-            nodes = ctl(f"tree .sf-main{surface} .jj6-n-wc")["nodes"]
+            wait_text(f".sf-main{surface} .jj7-r", "(no description set)")
+            nodes = ctl(f"tree .sf-main{surface} .jj7-n-wc")["nodes"]
             assert len(nodes) == 1, nodes
             wait_text(f".sf-dock{surface}", "modified.txt")
             ctl("key enter")

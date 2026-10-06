@@ -13,7 +13,7 @@ local M = {}
 -- remote hosts send their own copy of the plugin's stylesheet, which the window installs after
 -- ours; a sheet from another version must not match these elements. Change it together with
 -- the prefix in `jj.css` whenever the stylesheet changes.
-M.P = "jj6-"
+M.P = "jj7-"
 
 -- `names` (space-separated) as prefixed classes.
 function M.cls(names: string): string
@@ -288,6 +288,13 @@ function M.view(row: GraphRow, width: number): Node
 			local inner: { Node }? = nil
 			if c.node then
 				inner = { node(row) }
+				-- The working copy's ring and a plain ring are see-through: the lane stops at them.
+				local kind = row.kind or "node"
+				if kind == "wc" then
+					class ..= " nw"
+				elseif not row.label and kind ~= "immutable" then
+					class ..= " nr"
+				end
 			elseif quadrant then
 				inner = { ui.el("span", { class = M.cls("k k-" .. quadrant) }) }
 			end
