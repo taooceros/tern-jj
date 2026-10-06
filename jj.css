@@ -14,6 +14,13 @@
 .jj-l3 { --lane: var(--warn); }
 .jj-l4 { --lane: var(--tk-type, var(--accent)); }
 .jj-l5 { --lane: var(--ink-pen, var(--bad)); }
+/* A run's color between lanes (`hop` in graph.luau), for the cell's horizontal strokes. */
+.jj-h0 { --hop: var(--accent); }
+.jj-h1 { --hop: var(--live); }
+.jj-h2 { --hop: var(--ok); }
+.jj-h3 { --hop: var(--warn); }
+.jj-h4 { --hop: var(--tk-type, var(--accent)); }
+.jj-h5 { --hop: var(--ink-pen, var(--bad)); }
 
 /* ── Rows ───────────────────────────────────────────────────────────────── */
 .jj-r {
@@ -171,30 +178,38 @@
 }
 .jj-st::before { top: calc(-1 * var(--jj-hw)); }
 .jj-sb::before { bottom: calc(-1 * var(--jj-hw)); }
-/* A ring's middle is see-through, so the lane stops at its border rather than showing through:
-   above the node on `::before`, below it on `::after` (a node cell has no horizontal stroke). */
+/* A node's strokes: one segment each, from `--jj-gap` past its center to the cell's edge. A
+   ring's middle is see-through, so the lane stops at its border rather than showing through;
+   under an opaque node (an avatar, a dot) the segments meet at the center. */
 .jj-nw { --jj-gap: 6px; }
 .jj-nr { --jj-gap: 4px; }
-/* A merge: a larger hollow ring, as in Tern's Git block. */
-.jj-nm { --jj-gap: 6px; }
-.jj-n.jj-merge {
-	width: 13px;
-	height: 13px;
-	border-width: 2.5px;
-}
-.jj-nw.jj-sb::before,
-.jj-nr.jj-sb::before { top: calc(50% + var(--jj-gap)); }
-.jj-nw.jj-st::before,
-.jj-nr.jj-st::before { top: calc(-1 * var(--jj-hw)); bottom: calc(50% + var(--jj-gap)); }
-.jj-nw.jj-st.jj-sb::after,
-.jj-nr.jj-st.jj-sb::after {
-	content: "";
+.jj-nm { --jj-gap: 5px; }
+.jj-seg {
 	position: absolute;
+	background: var(--lane);
+}
+.jj-seg-t,
+.jj-seg-b {
 	left: calc(50% - var(--jj-hw));
 	width: calc(2 * var(--jj-hw));
-	top: calc(50% + var(--jj-gap));
-	bottom: calc(-1 * var(--jj-hw));
-	background: var(--lane);
+}
+.jj-seg-l,
+.jj-seg-r {
+	top: calc(50% - var(--jj-hw));
+	height: calc(2 * var(--jj-hw));
+}
+.jj-seg-t { top: calc(-1 * var(--jj-hw)); bottom: calc(50% + var(--jj-gap, 0px)); }
+.jj-seg-b { top: calc(50% + var(--jj-gap, 0px)); bottom: calc(-1 * var(--jj-hw)); }
+.jj-seg-l { left: calc(-1 * var(--jj-hw)); right: calc(50% + var(--jj-gap, 0px)); }
+.jj-seg-r { left: calc(50% + var(--jj-gap, 0px)); right: calc(-1 * var(--jj-hw)); }
+/* A merge: a hollow ring, as in Tern's Git block, its border as wide as the lanes. */
+.jj-n.jj-merge {
+	width: 12px;
+	height: 12px;
+	border: calc(2 * var(--jj-hw)) solid var(--lane);
+	border-radius: 50%;
+	transform: translate(-50%, -50%);
+	background: var(--panel, var(--card));
 }
 .jj-el::before {
 	background: none;
@@ -209,11 +224,11 @@
 	height: calc(2 * var(--jj-hw));
 	left: 50%;
 	right: 50%;
-	background: var(--lane);
+	background: var(--hop, var(--lane));
 }
 .jj-sl::after { left: calc(-1 * var(--jj-hw)); }
 .jj-sr::after { right: calc(-1 * var(--jj-hw)); }
-/* A hop over a vertical lane: the lane runs through, the hop sits on top with a gap. */
+/* A run over a vertical lane: both stay whole, the run on top in its own color. */
 .jj-x::before {
 	content: "";
 	position: absolute;
@@ -225,7 +240,6 @@
 }
 .jj-x::after {
 	z-index: 1;
-	box-shadow: 0 -2px 0 0 var(--panel, var(--card)), 0 2px 0 0 var(--panel, var(--card));
 }
 /* A turn: one corner of a rounded, lane-bordered box, seen through a window over the quarter of
    the cell between the edge on its horizontal side and the edge on its vertical side. The window
@@ -301,14 +315,14 @@
 	width: 10px;
 	height: 10px;
 	border-radius: 50%;
-	border: 2px solid var(--lane);
+	border: calc(2 * var(--jj-hw)) solid var(--lane);
 	background: var(--panel, var(--card));
 }
 .jj-n.jj-av {
 	width: 19px;
 	height: 19px;
 	border: 2px solid var(--panel, var(--card));
-	box-shadow: 0 0 0 1.5px var(--lane);
+	box-shadow: 0 0 0 calc(2 * var(--jj-hw)) var(--lane);
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -378,12 +392,12 @@
 .jj-a7 { --av: #dc2626; }
 .jj-n-conflict.jj-av {
 	--av: var(--bad-fill, var(--bad));
-	box-shadow: 0 0 0 1.5px var(--bad);
+	box-shadow: 0 0 0 calc(2 * var(--jj-hw)) var(--bad);
 }
 .jj-n-wc {
 	width: 14px;
 	height: 14px;
-	border: 2px solid var(--accent);
+	border: calc(2 * var(--jj-hw)) solid var(--accent);
 	box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
 .jj-n-wc::after {
@@ -411,7 +425,7 @@
 	transform: translate(-50%, -50%);
 	border-color: var(--panel, var(--card));
 	background: var(--av);
-	border: 2px dashed var(--lane);
+	border: calc(2 * var(--jj-hw)) dashed var(--lane);
 	background-clip: padding-box;
 }
 
