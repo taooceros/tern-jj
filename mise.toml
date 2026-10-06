@@ -28,7 +28,10 @@ run = [
 extends = "dev"
 description = "Type-check the plugin, not the bundled examples"
 depends = ["types"]
-run = "luau-lsp analyze --platform=standard --definitions=@luau=types/luau.d.luau --definitions=@tern=tern.d.luau host.luau"
+run = [
+  "luau-lsp analyze --platform=standard --definitions=@luau=types/luau.d.luau --definitions=@tern=tern.d.luau host.luau",
+  "luau-lsp analyze --platform=standard --definitions=@luau=types/luau.d.luau --definitions=@tern=tern.d.luau window.luau",
+]
 
 [tasks.dev]
 extends = "dev"

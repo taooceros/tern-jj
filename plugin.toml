@@ -1,10 +1,21 @@
 schema = 1
 id = "jj"
 name = "Jujutsu"
-version = "0.1.0"
-description = "Native Jujutsu status output."
+version = "0.3.0"
+description = "Native Jujutsu status and log output, and a changes block."
+icon = "commit"
 host = "host.luau"
+window = "window.luau"
+
+[[blocks]]
+id = "changes"
+title = "Jujutsu"
+icon = "commit"
 
 [[lenses]]
 id = "status"
 match = ["jj status", "jj st"]
+
+[[lenses]]
+id = "log"
+match = ["jj", "jj log", "jj log *"]

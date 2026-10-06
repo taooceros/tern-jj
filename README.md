@@ -3,8 +3,9 @@
 English | [日本語](README.ja.md)
 
 A Luau plugin development environment for adding Jujutsu support to Tern.
-Currently, it renders `jj status` and `jj st` output as native cards.
-It does not perform Jujutsu operations or replace Tern's existing Git UI.
+It renders `jj status` and `jj st` output as native cards, and adds a native
+**Jujutsu** block that lists changes and shows their diffs, like Tern's Git block.
+It does not replace Tern's existing Git UI.
 
 ## Requirements
 
@@ -33,13 +34,41 @@ The card colors additions green, modifications/renames yellow, and deletions red
 Change IDs use the accent color, commit IDs use the info color, and a clean
 working copy uses green. Colors follow the active Tern theme; unrecognized lines stay unchanged.
 Errors, empty output, and output exceeding 5,000 lines remain in Raw view.
-Status commands with additional arguments, `jj log`, `jj diff`, and other
-commands are not captured by this lens and retain their normal output.
+Status commands with additional arguments, `jj diff`, and other commands are not
+captured by this lens and retain their normal output.
+
+### Log lens
+
+`jj` and `jj log` (with any revset or limit) render as a native "Jujutsu log" card:
+the graph, change ID, flags (conflict, divergent, empty), description, bookmarks and tags,
+author, time and commit ID, one row per change. Click a row to copy its change ID.
+Output in another format (`-T`/`--template`, `--no-graph`, `-p`, `-s`, `--stat`, …),
+errors, and output the lens can't read stay raw.
+
+### Jujutsu block
+
+Run **Open Jujutsu changes** from the palette (⌥⌘J) in a pane inside a jj repository.
+The block opens beside it, or focuses the one already open in the tab, and shows:
+
+- jj's default log revset (up to 200 changes) as a native list: change ID with its
+  unique prefix highlighted, local bookmarks, description, author and age. `@` marks
+  the working copy, a lock icon immutable changes, red rows conflicts.
+- the selected change's files as native diffs (`jj diff --git`), one collapsible card per file.
+- keys: `↑`/`↓` (or `k`/`j`), `g`/`G`, `@` (jump to the working copy), `n` (`jj new` on the
+  selected change), `e` (`jj edit`), `u` (`jj undo`), `r` (refresh). The dock has buttons for the same operations.
+
+Every operation is a plain `jj` command, so `u` reverts any of them. The block reloads
+after every `jj` command that finishes in a Tern pane. Outside a repository it shows
+jj's error and a Retry button. jj is looked up on the daemon's `PATH`, then in the usual
+Homebrew, Cargo, Nix and zerobrew locations.
 
 ## Editing and verification
 
-- `host.luau`: host-side lens implementation; saving reloads it automatically.
-- `plugin.toml`: declares the entry point and command patterns to capture.
+- `host.luau`: host-side lens implementation; loads the block from `changes.luau`. Saving reloads it automatically.
+- `changes.luau`: the Jujutsu block.
+- `loglens.luau`: the `jj`/`jj log` lens.
+- `window.luau`: the palette command and its ⌥⌘J binding.
+- `plugin.toml`: declares the entry points, the block and the command patterns to capture.
 - `mise run reload`: manually reloads the development daemon's plugins; requires `dev` to be running.
 - `mise run smoke`: uses a temporary jj repository and an independent Tern window
   to verify clean output, added/modified/deleted/renamed file colors, change/commit

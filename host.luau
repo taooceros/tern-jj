@@ -2,6 +2,9 @@
 
 local ui = tern.ui
 
+require("./changes")
+require("./loglens")
+
 tern.on("spawn", function(spec: SpawnSpec): SpawnSpec
 	spec.env.JJ_PAGER = "cat"
 	return spec

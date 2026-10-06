@@ -3,8 +3,9 @@
 [English](README.md) | 日本語
 
 Tern に Jujutsu サポートを追加するための Luau プラグイン開発環境。
-現時点では `jj status` / `jj st` の出力をネイティブカードで表示します。
-Jujutsu の操作や既存の Git UI の置き換えは行いません。
+`jj status` / `jj st` の出力をネイティブカードで表示し、Tern の Git ブロックのように
+change の一覧と diff を表示するネイティブな **Jujutsu** ブロックを追加します。
+既存の Git UI の置き換えは行いません。
 
 ## 前提
 
@@ -32,12 +33,37 @@ Luau は Tern が直接実行するため、コンパイルやバンドルは不
 change ID はアクセント色、commit ID は情報色、変更なしのメッセージは緑になります。
 色は Tern のテーマに従い、認識できない行は元の文字列のまま表示します。
 エラー・空の出力・5,000 行を超える出力は Raw 表示を維持します。
-引数付きの status、`jj log`、`jj diff` などはレンズで取得せず通常の出力になります。
+引数付きの status、`jj diff` などはこのレンズで取得せず通常の出力になります。
+
+### Log レンズ
+
+`jj` と `jj log`（revset や件数の指定を含む）はネイティブな「Jujutsu log」カードで表示されます:
+グラフ、change ID、フラグ（conflict、divergent、empty）、説明、bookmark とタグ、作者、時刻、commit ID を
+change ごとに 1 行で表示。行をクリックすると change ID をコピーします。
+別の形式（`-T`/`--template`、`--no-graph`、`-p`、`-s`、`--stat` など）、エラー、読み取れない出力は Raw のままです。
+
+### Jujutsu ブロック
+
+jj リポジトリ内のペインでパレットから **Open Jujutsu changes**（⌥⌘J）を実行します。
+ブロックは隣に開き（同じタブに既にあればフォーカス）、次を表示します。
+
+- jj の既定の log revset（最大 200 件）をネイティブなリストで表示: 一意な接頭辞を強調した change ID、
+  ローカル bookmark、説明、作者、経過時間。`@` は作業コピー、鍵アイコンは immutable、赤い行は競合。
+- 選択中の change のファイルをネイティブ diff で表示（`jj diff --git`、ファイルごとに折りたためるカード）。
+- キー: `↑`/`↓`（`k`/`j`）、`g`/`G`、`@`（作業コピーへ移動）、`n`（選択中の change に `jj new`）、
+  `e`（`jj edit`）、`u`（`jj undo`）、`r`（再読み込み）。ドックに同じ操作のボタンがあります。
+
+操作はすべて通常の `jj` コマンドなので、`u` でどれも取り消せます。Tern のペインで `jj` コマンドが
+終了するたびにブロックは再読み込みされます。リポジトリ外では jj のエラーと Retry ボタンを表示します。
+jj はデーモンの `PATH`、続いて Homebrew・Cargo・Nix・zerobrew の一般的な場所から探します。
 
 ## 編集と確認
 
-- `host.luau`: ホスト側のレンズ実装。保存すると自動再読み込み。
-- `plugin.toml`: エントリーと取得するコマンドを宣言。
+- `host.luau`: ホスト側のレンズ実装。`changes.luau` のブロックを読み込む。保存すると自動再読み込み。
+- `changes.luau`: Jujutsu ブロック。
+- `loglens.luau`: `jj` / `jj log` レンズ。
+- `window.luau`: パレットコマンドと ⌥⌘J のバインド。
+- `plugin.toml`: エントリー、ブロック、取得するコマンドを宣言。
 - `mise run reload`: 開発デーモンを手動再読み込み。`dev` の起動が必要。
 - `mise run smoke`: 一時的な jj リポジトリと独立した Tern ウィンドウで、
   変更なし・追加／変更／削除／リネームの文字色・change/commit ID の文字色・リポジトリ外のエラー表示を確認。

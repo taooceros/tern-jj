@@ -26,7 +26,7 @@ with tempfile.TemporaryDirectory(prefix="tern-jj-", dir="/tmp") as temporary:
     subprocess.run(["jj", "git", "init", "--no-colocate", str(repo)], check=True, env=env)
     package = work / "package"
     package.mkdir()
-    for name in ("plugin.toml", "host.luau"):
+    for name in ("plugin.toml", "host.luau", "changes.luau", "window.luau"):
         (package / name).write_bytes((ROOT / name).read_bytes())
     subprocess.run([TERN, "plugin", "install", str(package)], check=True, env=env)
     control = str(work / "control.sock")
@@ -102,6 +102,39 @@ with tempfile.TemporaryDirectory(prefix="tern-jj-", dir="/tmp") as temporary:
                         assert any(node.get("text") == expected for node in styled["nodes"]), styled
             ctl("shot jj-status")
             print("PASS: added, modified, deleted, renamed files and commit IDs render styled text")
+
+            def jj_log(revset):
+                return subprocess.run(["jj", "log", "--no-graph", "-r", revset, "-T", 'change_id ++ "\\n"'],
+                                      cwd=repo, env=env, check=True, text=True,
+                                      capture_output=True).stdout.split()
+
+            ctl("key alt+cmd+j")
+            block = ".sf-main[data-surface='plugin.jj.changes']"
+            deadline = time.monotonic() + 15
+            while True:
+                texts = [n.get("text", "") for n in ctl(f"tree {block} .sf-card")["nodes"]]
+                if any("modified.txt" in t for t in texts):
+                    break
+                assert time.monotonic() < deadline, texts
+                time.sleep(0.2)
+            assert any("Renamed from before.txt" in t for t in texts), texts
+            ctl("shot jj-changes")
+            print("PASS: the Jujutsu block lists changes and shows the working copy's files")
+
+            before = jj_log("@")
+            ctl("key n")
+            deadline = time.monotonic() + 15
+            while jj_log("@") == before:
+                assert time.monotonic() < deadline, "n did not create a new change"
+                time.sleep(0.2)
+            assert jj_log("@-") == before, "the new change is not on the selected one"
+            ctl("key u")
+            deadline = time.monotonic() + 15
+            while jj_log("@") != before:
+                assert time.monotonic() < deadline, "u did not undo the new change"
+                time.sleep(0.2)
+            print("PASS: n runs jj new on the selected change and u undoes it")
+            ctl("close")
 
             ctl("tab new")
             ctl("ready")
