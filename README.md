@@ -29,10 +29,12 @@ mise run dev
 
 Tern executes Luau directly; no compilation or bundling is required.
 `check` performs static type checking, and `dev` launches Tern.
-Run `jj status` in the opened pane to display a "Jujutsu status" card.
-The card colors additions green, modifications/renames yellow, and deletions red.
-Change IDs use the accent color, commit IDs use the info color, and a clean
-working copy uses green. Colors follow the active Tern theme; unrecognized lines stay unchanged.
+Run `jj status` in the opened pane to see it as Tern's native `git status` shows a repository:
+the working copy's change ID, commit ID and description as the header, then a collapsible
+"Working copy changes" section (and "Conflicts" when there are any) with each path linked to its
+file and its kind on the right: added green, modified and renamed (with the old path) yellow,
+deleted red. The parent commits follow; a clean working copy says so in green. Colors follow
+the active Tern theme; lines the lens doesn't know (hints) stay as muted text.
 Errors, empty output, and output exceeding 5,000 lines remain in Raw view.
 Status commands with additional arguments, `jj diff`, and other commands are not
 captured by this lens and retain their normal output.

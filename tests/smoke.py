@@ -69,9 +69,8 @@ with tempfile.TemporaryDirectory(prefix="tern-jj-", dir="/tmp") as temporary:
             assert state["focused"]["last"]["status"] == 0, "New shell did not receive JJ_PAGER=cat"
 
             ctl('run "jj status"')
-            ctl('plugins expect "Jujutsu status"')
             ctl('plugins expect "The working copy has no changes."')
-            print("PASS: clean repository renders a native status card")
+            print("PASS: clean repository renders a native status view")
 
             for name in ("modified.txt", "deleted.txt", "before.txt"):
                 (repo / name).write_text("original\n", encoding="utf-8")
@@ -82,16 +81,21 @@ with tempfile.TemporaryDirectory(prefix="tern-jj-", dir="/tmp") as temporary:
 
             (repo / "changed file.txt").write_text("Jujutsu smoke check\n", encoding="utf-8")
             ctl('run "jj st"')
-            ctl('plugins expect "A changed file.txt"')
-            tree = ctl("tree .sf-block[data-role='lens.plugin.jj.status']")
+            ctl('plugins expect "Working copy changes"')
+            lens = ".sf-block[data-role='lens.plugin.jj.status']"
+            tree = ctl(f"tree {lens}")
             (ARTIFACTS / "status-tree.json").write_text(json.dumps(tree, indent=2), encoding="utf-8")
+            texts = [node.get("text", "") for node in tree["nodes"]]
+            for path in ("changed file.txt", "modified.txt", "after.txt", "deleted.txt"):
+                assert any(path in t for t in texts), (path, texts)
+            assert any("from before.txt" in t for t in texts), texts
             for token, expected in (
-                ("success", "A changed file.txt"),
-                ("warning", "M modified.txt"),
-                ("warning", "R {before.txt => after.txt}"),
-                ("error", "D deleted.txt"),
+                ("success", "added"),
+                ("warning", "modified"),
+                ("warning", "renamed"),
+                ("error", "deleted"),
             ):
-                styled = ctl(f"tree .sf-block[data-role='lens.plugin.jj.status'] .sf-t-{token}")
+                styled = ctl(f"tree {lens} .sf-t-{token}")
                 assert any(node.get("text") == expected for node in styled["nodes"]), styled
             status_output = subprocess.run(["jj", "status", "--color=never"], cwd=repo,
                                            env=env, check=True, text=True, capture_output=True).stdout

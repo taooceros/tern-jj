@@ -1,5 +1,12 @@
 /* Jujutsu views, styled after Tern's Git block. */
 
+/* `jj status`: a changed file's path on the left, its kind on the right, as in `git status`. */
+.jj-sr {
+	display: flex;
+	justify-content: space-between;
+	gap: 16px;
+}
+
 /* ── Lanes: one color per graph column, from the theme ─────────────────── */
 .jj-l0 { --lane: var(--accent); }
 .jj-l1 { --lane: var(--live); }
