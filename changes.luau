@@ -219,7 +219,7 @@ local function parse_log(stdout: string): ({ Row }, { Change })
 			table.insert(rows, { cells = cells, kind = nil, change = nil, elided = elided })
 		end
 	end
-	graph.link(rows)
+	graph.layout(rows)
 	return rows, changes
 end
 

@@ -69,11 +69,14 @@ The block opens beside it, or focuses the one already open in the tab, and shows
 - keys: `↑`/`↓` (or `k`/`j`), `g`/`G`, `@` (jump to the working copy), `n` (`jj new` on the
   selected change), `e` (`jj edit`), `u` (`jj undo`), `r` (refresh). The toolbar has buttons for the same operations.
 
-The graph is jj's own layout (`ui.graph.style=curved`): `graph.luau` reads each graph
+The `jj log` lens draws jj's own layout (`ui.graph.style=curved`): `graph.luau` reads each graph
 character as strokes from its cell's center, and `jj.css` draws them, so lanes stay
 continuous whatever the row height. A branch leaves its lane at a right angle and turns in one
-curve into the lane it joins, as in Tern's Git block: from the side of the change's node when
-the fork or merge is next to it, else from a dot on the lane.
+curve into the lane it joins: from the side of the change's node when the fork or merge is next
+to it, else from a dot on the lane. The Jujutsu block lays the lanes out itself, as Tern's Git
+block does: it follows jj's strokes to find each change's parents, keeps every edge on its own
+lane down to its parent, and turns it into the parent's row there, so a parent's children stem
+from it at different lengths and jj's junction rows go away.
 
 Every operation is a plain `jj` command, so `u` reverts any of them. The block reloads
 after every `jj` command that finishes in a Tern pane. Outside a repository it shows

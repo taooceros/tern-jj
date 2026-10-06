@@ -36,7 +36,10 @@ local GLYPH_KIND: { [string]: string } = {
 	["◌"] = "hidden",
 }
 
-export type Cell = { glyph: string, strokes: string, node: boolean, elided: boolean, cross: boolean? }
+-- `lane` overrides the cell's lane color (by default its column's), for a run between lanes.
+-- `turn` is a curve drawn besides the straight `strokes` (set by `layout` where a run goes on
+-- past a corner).
+export type Cell = { glyph: string, strokes: string, node: boolean, elided: boolean, cross: boolean?, lane: number?, turn: string? }
 
 -- A graph row: its cells; for a change, the node's kind, its author, the avatar's
 -- initials and color, and whether a ref pill on the left connects to the node.
@@ -188,10 +191,10 @@ local function fold(rows: { GraphRow }, r: number, i: number): boolean
 	return true
 end
 
--- Connects node and `~` cells to their neighbours, in place, and, as in Tern's Git block,
--- draws an avatar only where the author changes from the avatar or dot above: the rest are
--- dots. The working copy's ring and the root's diamond show no author, so the next one does.
-function M.link(rows: { GraphRow })
+-- As in Tern's Git block, an avatar only where the author changes from the avatar or dot
+-- above: the rest are dots. The working copy's ring and the root's diamond show no author, so
+-- the next one does.
+local function faces(rows: { GraphRow })
 	local last: string? = nil
 	for _, row in rows do
 		if row.kind then
@@ -200,6 +203,11 @@ function M.link(rows: { GraphRow })
 			last = if face then row.author else nil
 		end
 	end
+end
+
+-- Connects node and `~` cells to their neighbours, in place, keeping jj's layout.
+function M.link(rows: { GraphRow })
+	faces(rows)
 	for r, row in rows do
 		for i, c in row.cells do
 			if c.node or c.elided then
@@ -244,6 +252,197 @@ function M.link(rows: { GraphRow })
 	end
 end
 
+-- Where a vertex's edges lead, following jj's strokes down from `(r, i)` entered from `from`
+-- (`"t"` moving down, `"l"` moving right, `"r"` moving left): every vertex (node or `~`) they
+-- reach, in the order found, straight down first. Strokes never lead back up; `┼` and a `─` hop
+-- over a lane go straight through.
+local function trace(rows: { GraphRow }, r: number, i: number, from: string, out: { string }, seen: { [string]: boolean })
+	local row = rows[r]
+	local c = row and row.cells[i]
+	local key = r .. ":" .. i .. from
+	if not c or seen[key] then
+		return
+	end
+	seen[key] = true
+	local s = c.strokes
+	if c.node or c.elided then
+		if from == "t" and not table.find(out, r .. ":" .. i) then
+			table.insert(out, r .. ":" .. i)
+		end
+		return
+	end
+	local exits: string
+	if from == "t" and s == "lr" then
+		exits = "b"
+	elseif not string.find(s, from, 1, true) then
+		return
+	elseif s == "tblr" then
+		exits = if from == "t" then "b" elseif from == "l" then "r" else "l"
+	else
+		exits = ""
+		for _, d in { "b", "l", "r" } do
+			if d ~= from and string.find(s, d, 1, true) then
+				exits ..= d
+			end
+		end
+	end
+	for d in string.gmatch(exits, ".") do
+		if d == "b" then
+			trace(rows, r + 1, i, "t", out, seen)
+		elseif d == "r" then
+			trace(rows, r, i + 1, "l", out, seen)
+		else
+			trace(rows, r, i - 1, "r", out, seen)
+		end
+	end
+end
+
+local function blank_cell(): Cell
+	return { glyph = " ", strokes = "", node = false, elided = false }
+end
+
+-- One vertex's place in a row of the native layout: its lane, the lanes ending in it from
+-- above, the lanes leaving it for its other parents, and whether a lane runs on above/below it.
+type Place = { cell: Cell, lane: number, ends: { number }, news: { number }, top: boolean, bottom: boolean }
+
+-- Lays the graph out as Tern's Git block does, in place: jj's order and edges, but every edge
+-- keeps its own lane down to its parent, where it turns into the parent's row, so a parent's
+-- children stem from it at different lengths. Only rows with a node or `~` stay; jj's
+-- junction rows are hidden.
+function M.layout(rows: { GraphRow })
+	faces(rows)
+	local edges: { [string]: { string } } = {}
+	for r, row in rows do
+		for i, c in row.cells do
+			if c.node or c.elided then
+				local out: { string } = {}
+				trace(rows, r + 1, i, "t", out, {})
+				edges[r .. ":" .. i] = out
+			end
+		end
+	end
+	local slots: { string | false } = {}
+	local places: { [number]: { Place } } = {}
+	local passing: { [number]: { [number]: boolean } } = {}
+	local lanes = 0
+	for r, row in rows do
+		local above = table.clone(slots)
+		local busy: { [number]: boolean } = {}
+		local list: { Place } = {}
+		for i, c in row.cells do
+			if c.node or c.elided then
+				local key = r .. ":" .. i
+				local incoming: { number } = {}
+				for k, target in slots do
+					if target == key then
+						table.insert(incoming, k)
+						slots[k] = false
+						busy[k] = true
+					end
+				end
+				local lane = incoming[1]
+				if not lane then
+					lane = 1
+					while slots[lane] or busy[lane] do
+						lane += 1
+					end
+				end
+				busy[lane] = true
+				local place: Place = { cell = c, lane = lane, ends = {}, news = {}, top = incoming[1] ~= nil, bottom = false }
+				for n = 2, #incoming do
+					table.insert(place.ends, incoming[n])
+				end
+				for n, dest in edges[key] do
+					local k = lane
+					if n == 1 then
+						place.bottom = true
+					else
+						k = lane + 1
+						while slots[k] or busy[k] do
+							k += 1
+						end
+						busy[k] = true
+						table.insert(place.news, k)
+					end
+					slots[k] = dest
+				end
+				table.insert(list, place)
+			end
+		end
+		if #list > 0 then
+			places[r] = list
+			local through: { [number]: boolean } = {}
+			for k, target in above do
+				if target and slots[k] == target then
+					through[k] = true
+				end
+			end
+			passing[r] = through
+		end
+		lanes = math.max(lanes, #slots)
+	end
+	local width = 2 * lanes - 1
+	for r, row in rows do
+		local list = places[r]
+		local cells: { Cell } = {}
+		if list then
+			for x = 1, width do
+				cells[x] = blank_cell()
+			end
+			for k in passing[r] do
+				cells[2 * k - 1].strokes = "tb"
+			end
+			for _, p in list do
+				local at = 2 * p.lane - 1
+				local v = p.cell
+				cells[at] = { glyph = v.glyph, strokes = (if p.top then "t" else "") .. (if p.bottom then "b" else ""), node = v.node, elided = v.elided }
+				-- Each turn's corner, then the run from the vertex to it, colored as its lane.
+				local turns: { { lane: number, v: string } } = {}
+				for _, k in p.ends do
+					table.insert(turns, { lane = k, v = "t" })
+				end
+				for _, k in p.news do
+					table.insert(turns, { lane = k, v = "b" })
+				end
+				table.sort(turns, function(a, b)
+					return math.abs(a.lane - p.lane) > math.abs(b.lane - p.lane)
+				end)
+				for _, t in turns do
+					local side = if t.lane > p.lane then "l" else "r"
+					local step = if t.lane > p.lane then 1 else -1
+					local corner = cells[2 * t.lane - 1]
+					-- A corner the run goes on past curves the same way; the run stays straight
+					-- on its far side.
+					if corner.strokes ~= "" then
+						corner.turn, corner.strokes = side .. t.v, if side == "l" then "r" else "l"
+					else
+						corner.strokes = side .. t.v
+					end
+					corner.lane = nil
+					cells[at].strokes ..= if side == "l" then "r" else "l"
+					for x = at + step, 2 * t.lane - 1 - step, step do
+						local c = cells[x]
+						if c.strokes == "tb" then
+							c.strokes, c.cross = "lr", true
+						elseif c.strokes == "" then
+							c.strokes = "lr"
+						end
+						if not c.cross then
+							c.lane = t.lane - 1
+						end
+					end
+				end
+				local s = cells[at].strokes
+				cells[at].strokes = (if string.find(s, "t") then "t" else "") .. (if string.find(s, "b") then "b" else "")
+					.. (if string.find(s, "l") then "l" else "") .. (if string.find(s, "r") then "r" else "")
+			end
+		else
+			row.hidden = true
+		end
+		row.cells = cells
+	end
+end
+
 -- The widest row, in cells.
 function M.width(rows: { GraphRow }): number
 	local w = 0
@@ -281,6 +480,9 @@ end
 -- drawn straight. Only corners turn: a junction stays square where its branch leaves the lane,
 -- so `├─╮` meets the lane at a right angle and curves once, into the lane it joins.
 local function turn(c: Cell): (string?, string)
+	if c.turn then
+		return c.turn, c.strokes
+	end
 	local s = c.strokes
 	if s == "lb" or s == "lt" or s == "rb" or s == "rt" then
 		return s, ""
@@ -309,7 +511,7 @@ function M.view(row: GraphRow, width: number): Node
 				table.insert(kids, spacer(blank, before_node))
 				blank = 0
 			end
-			local class = "jj-gc jj-l" .. ((i - 1) // 2) % 6
+			local class = "jj-gc jj-l" .. (c.lane or (i - 1) // 2) % 6
 			local quadrant, straight = turn(c)
 			for s in string.gmatch(straight, ".") do
 				class ..= " jj-s" .. s
