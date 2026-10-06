@@ -1,16 +1,19 @@
 /* Jujutsu views, styled after Tern's Git block. Scoped to the plugin's block
-   and its lens so nothing leaks into other surfaces. */
+   and its lens so nothing leaks into other surfaces. Every class carries the
+   prefix `graph.P` (`jj6-`): an attached remote host's copy of this sheet,
+   installed after ours, matches only the classes of its own version. Change the
+   prefix in both places whenever this sheet changes. */
 
 /* ── Lanes: one color per graph column, from the theme ─────────────────── */
-.jj-l0 { --lane: var(--accent); }
-.jj-l1 { --lane: var(--live); }
-.jj-l2 { --lane: var(--ok); }
-.jj-l3 { --lane: var(--warn); }
-.jj-l4 { --lane: var(--tk-type, var(--accent)); }
-.jj-l5 { --lane: var(--ink-pen, var(--bad)); }
+.jj6-l0 { --lane: var(--accent); }
+.jj6-l1 { --lane: var(--live); }
+.jj6-l2 { --lane: var(--ok); }
+.jj6-l3 { --lane: var(--warn); }
+.jj6-l4 { --lane: var(--tk-type, var(--accent)); }
+.jj6-l5 { --lane: var(--ink-pen, var(--bad)); }
 
 /* ── Rows ───────────────────────────────────────────────────────────────── */
-.jj-r {
+.jj6-r {
 	display: flex;
 	align-items: center;
 	gap: 10px;
@@ -20,24 +23,24 @@
 	font-size: 13px;
 	color: var(--t1);
 }
-.jj-r.jj-edge {
+.jj6-r.jj6-edge {
 	min-height: calc(var(--sf-lh, 18px) * 0.7);
 }
-.jj-r.jj-pick {
+.jj6-r.jj6-pick {
 	cursor: default;
 	border-radius: 6px;
 }
-.jj-r.jj-pick:hover {
+.jj6-r.jj6-pick:hover {
 	background: var(--l1);
 }
-.jj-r.jj-sel,
-.jj-r.jj-sel:hover {
+.jj6-r.jj6-sel,
+.jj6-r.jj6-sel:hover {
 	background: color-mix(in srgb, var(--accent) 14%, transparent);
 	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
 /* Columns */
-.jj-refs {
+.jj6-refs {
 	display: flex;
 	align-items: center;
 	gap: 4px;
@@ -45,7 +48,7 @@
 	flex: none;
 	overflow: hidden;
 }
-.jj-cline {
+.jj6-cline {
 	flex: 1;
 	align-self: stretch;
 	min-width: 6px;
@@ -53,7 +56,7 @@
 }
 /* Spare width goes to the description; its `min` (set by the block) is the floor below
    which the rows scroll sideways. `width: 0` keeps long text out of the row's minimum. */
-.jj-msg {
+.jj6-msg {
 	display: flex;
 	align-items: center;
 	gap: 8px;
@@ -62,32 +65,32 @@
 	min-width: 0;
 	overflow: clip;
 }
-.jj-bar {
+.jj6-bar {
 	flex: none;
 	width: 3px;
 	height: 15px;
 	border-radius: 2px;
 	background: var(--lane);
 }
-.jj-date {
+.jj6-date {
 	flex: none;
 	color: var(--t3);
 	font-variant-numeric: tabular-nums;
 }
-.jj-id {
+.jj6-id {
 	flex: none;
 	font-family: var(--mono);
 	font-size: 12px;
 	color: var(--t3);
 }
-.jj-id .jj-idp,
-.jj-id.jj-idp {
+.jj6-id .jj6-idp,
+.jj6-id.jj6-idp {
 	color: var(--accent-ink);
 	font-weight: 600;
 }
 
 /* Ref pills */
-.jj-pill {
+.jj6-pill {
 	display: inline-flex;
 	align-items: center;
 	gap: 4px;
@@ -104,99 +107,131 @@
 	box-shadow: inset 0 0 0 1px var(--l3);
 	background: var(--card);
 }
-.jj-pill.jj-bm {
+.jj6-pill.jj6-bm {
 	color: var(--live);
 	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--live) 45%, transparent);
 }
-.jj-pill.jj-bm.jj-here {
+.jj6-pill.jj6-bm.jj6-here {
 	color: #fff;
 	background: var(--accent-fill);
 	box-shadow: none;
 }
-.jj-pill.jj-tag {
+.jj6-pill.jj6-tag {
 	color: var(--warn);
 	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 50%, transparent);
 }
-.jj-pill.jj-wc {
+.jj6-pill.jj6-wc {
 	color: var(--ok);
 	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 45%, transparent);
 	background: color-mix(in srgb, var(--ok) 10%, transparent);
 }
-.jj-pill.jj-conf {
+.jj6-pill.jj6-conf {
 	color: var(--bad);
 	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bad) 45%, transparent);
 }
-.jj-pill.jj-stat {
+.jj6-pill.jj6-stat {
 	color: var(--warn);
 	background: color-mix(in srgb, var(--warn) 12%, transparent);
 	box-shadow: none;
 }
 
 /* ── Graph ──────────────────────────────────────────────────────────────── */
-.jj-g {
+/* Strokes are 2 px of the screen whatever the zoom (the region's `zoom` is font / 13): at a
+   fractional width, a curve's border and a neighbour's straight stroke round to the device's
+   pixels differently and meet with a jog. */
+.jj6-g {
+	--jj6-hw: calc(1px / var(--sf-zoom, 1));
 	display: flex;
 	align-self: stretch;
 	flex: none;
 	position: relative;
 	isolation: isolate;
 }
-.jj-gs,
-.jj-gc {
+.jj6-gs,
+.jj6-gc {
 	display: block;
 	flex: none;
 	position: relative;
 }
-.jj-st::before,
-.jj-sb::before {
+.jj6-st::before,
+.jj6-sb::before {
 	content: "";
 	position: absolute;
-	left: calc(50% - 1px);
-	width: 2px;
+	left: calc(50% - var(--jj6-hw));
+	width: calc(2 * var(--jj6-hw));
 	top: 50%;
 	bottom: 50%;
 	background: var(--lane);
 }
-.jj-st::before { top: 0; }
-.jj-sb::before { bottom: 0; }
-.jj-st.jj-sb::before { top: 0; bottom: 0; }
-.jj-el::before {
+.jj6-st::before { top: 0; }
+.jj6-sb::before { bottom: 0; }
+.jj6-st.jj6-sb::before { top: 0; bottom: 0; }
+.jj6-el::before {
 	background: none;
-	border-left: 2px dotted var(--lane);
+	border-left: calc(2 * var(--jj6-hw)) dotted var(--lane);
 	width: 0;
 }
-.jj-sl::after,
-.jj-sr::after {
+.jj6-sl::after,
+.jj6-sr::after {
 	content: "";
 	position: absolute;
-	top: calc(50% - 1px);
-	height: 2px;
+	top: calc(50% - var(--jj6-hw));
+	height: calc(2 * var(--jj6-hw));
 	left: 50%;
 	right: 50%;
 	background: var(--lane);
 }
-.jj-sl::after { left: 0; }
-.jj-sr::after { right: 0; }
-.jj-sl.jj-sr::after { left: 0; right: 0; }
+.jj6-sl::after { left: 0; }
+.jj6-sr::after { right: 0; }
+.jj6-sl.jj6-sr::after { left: 0; right: 0; }
 /* A hop over a vertical lane: the lane runs through, the hop sits on top with a gap. */
-.jj-x::before {
+.jj6-x::before {
 	content: "";
 	position: absolute;
-	left: calc(50% - 1px);
-	width: 2px;
+	left: calc(50% - var(--jj6-hw));
+	width: calc(2 * var(--jj6-hw));
 	top: 0;
 	bottom: 0;
 	background: var(--lane);
 }
-.jj-x::after {
+.jj6-x::after {
 	z-index: 1;
 	box-shadow: 0 -2px 0 0 var(--panel, var(--card)), 0 2px 0 0 var(--panel, var(--card));
 }
+/* A turn: the quarter of the cell between the edge on its horizontal side and the edge on its
+   vertical side. It shows one corner of a rounded, lane-bordered box twice its size, so the
+   borders meet the straight strokes of the cells around it. */
+.jj6-k {
+	position: absolute;
+	overflow: hidden;
+}
+.jj6-k::before {
+	content: "";
+	position: absolute;
+	box-sizing: border-box;
+	width: 200%;
+	height: 200%;
+	border: calc(2 * var(--jj6-hw)) solid var(--lane);
+	border-radius: 6px;
+}
+.jj6-k-lb,
+.jj6-k-lt { left: 0; right: calc(50% - var(--jj6-hw)); }
+.jj6-k-rb,
+.jj6-k-rt { left: calc(50% - var(--jj6-hw)); right: 0; }
+.jj6-k-lb,
+.jj6-k-rb { top: calc(50% - var(--jj6-hw)); bottom: 0; }
+.jj6-k-lt,
+.jj6-k-rt { top: 0; bottom: calc(50% - var(--jj6-hw)); }
+.jj6-k-lb::before { top: 0; right: 0; }
+.jj6-k-lt::before { bottom: 0; right: 0; }
+.jj6-k-rb::before { top: 0; left: 0; }
+.jj6-k-rt::before { bottom: 0; left: 0; }
 /* The thin connector from a row's ref pills to its node. */
-.jj-cx {
+.jj6-cx {
 	background: linear-gradient(var(--l3), var(--l3)) center / 100% 1px no-repeat;
 }
 /* ...bridging the row's flex gap between the ref column and the graph. */
-.jj-gx::before {
+.jj6-gx::before {
 	content: "";
 	position: absolute;
 	right: 100%;
@@ -205,12 +240,12 @@
 	height: 1px;
 	background: var(--l3);
 }
-.jj-cxh {
+.jj6-cxh {
 	background: linear-gradient(var(--l3), var(--l3)) left center / 50% 1px no-repeat;
 }
 
 /* Nodes */
-.jj-n {
+.jj6-n {
 	position: absolute;
 	z-index: 1;
 	left: 50%;
@@ -223,7 +258,7 @@
 	border: 2px solid var(--lane);
 	background: var(--panel, var(--card));
 }
-.jj-n.jj-av {
+.jj6-n.jj6-av {
 	width: 19px;
 	height: 19px;
 	border: 2px solid var(--panel, var(--card));
@@ -238,32 +273,32 @@
 	color: #fff;
 	background: var(--av);
 }
-.jj-a0 { --av: #3b82f6; }
-.jj-a1 { --av: #db2777; }
-.jj-a2 { --av: #10b981; }
-.jj-a3 { --av: #8b5cf6; }
-.jj-a4 { --av: #0ea5e9; }
-.jj-a5 { --av: #f59e0b; }
-.jj-a6 { --av: #0d9488; }
-.jj-a7 { --av: #dc2626; }
-.jj-n-conflict.jj-av {
+.jj6-a0 { --av: #3b82f6; }
+.jj6-a1 { --av: #db2777; }
+.jj6-a2 { --av: #10b981; }
+.jj6-a3 { --av: #8b5cf6; }
+.jj6-a4 { --av: #0ea5e9; }
+.jj6-a5 { --av: #f59e0b; }
+.jj6-a6 { --av: #0d9488; }
+.jj6-a7 { --av: #dc2626; }
+.jj6-n-conflict.jj6-av {
 	--av: var(--bad-fill, var(--bad));
 	box-shadow: 0 0 0 1.5px var(--bad);
 }
-.jj-n-wc {
+.jj6-n-wc {
 	width: 14px;
 	height: 14px;
 	border: 2px solid var(--accent);
 	box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
-.jj-n-wc::after {
+.jj6-n-wc::after {
 	content: "";
 	position: absolute;
 	inset: 2px;
 	border-radius: 50%;
 	background: var(--accent);
 }
-.jj-n-immutable {
+.jj6-n-immutable {
 	width: 10px;
 	height: 10px;
 	border-radius: 2px;
@@ -271,10 +306,10 @@
 	background: var(--lane);
 	border-color: var(--lane);
 }
-.jj-n-hidden {
+.jj6-n-hidden {
 	border-style: dashed;
 }
-.jj-n-immutable.jj-av {
+.jj6-n-immutable.jj6-av {
 	width: 19px;
 	height: 19px;
 	border-radius: 50%;
@@ -299,7 +334,7 @@
 }
 /* The toolbar+header and the rows+footer: as wide as a row's columns at their minimum
    (the description's `min`), at least the pane, so both scroll sideways together. */
-.sf-main[data-surface='plugin.jj.changes'] > .jj-top,
+.sf-main[data-surface='plugin.jj.changes'] > .jj6-top,
 .sf-main[data-surface='plugin.jj.changes'] > [data-role='jj.rows'] {
 	width: max-content;
 	min-width: 100%;
@@ -307,7 +342,7 @@
 .sf-main[data-surface='plugin.jj.changes'] > [data-role='jj.rows'] {
 	padding-top: 6px;
 }
-.jj-top {
+.jj6-top {
 	position: sticky;
 	top: 0;
 	z-index: 2;
@@ -316,7 +351,7 @@
 	font-family: var(--sans);
 }
 /* Capped at the pane's width by the block, it stays put while the rows scroll sideways. */
-.jj-bar-row {
+.jj6-bar-row {
 	position: sticky;
 	left: 0;
 	display: flex;
@@ -325,7 +360,7 @@
 	padding: 6px 10px 6px 8px;
 	font-size: 13px;
 }
-.jj-bar-row .jj-where {
+.jj6-bar-row .jj6-where {
 	display: flex;
 	align-items: center;
 	gap: 6px;
@@ -336,16 +371,16 @@
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
-.jj-bar-row .jj-sep {
+.jj6-bar-row .jj6-sep {
 	width: 1px;
 	height: 16px;
 	background: var(--l2);
 	margin: 0 4px;
 }
-.jj-bar-row .jj-grow {
+.jj6-bar-row .jj6-grow {
 	flex: 1;
 }
-.jj-btn {
+.jj6-btn {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -354,32 +389,32 @@
 	border-radius: 6px;
 	color: var(--t2);
 }
-.jj-btn:hover {
+.jj6-btn:hover {
 	background: var(--l1);
 	color: var(--t1);
 }
-.jj-btn.jj-busy {
+.jj6-btn.jj6-busy {
 	color: var(--accent);
 }
-.jj-hd {
+.jj6-hd {
 	min-height: 26px;
 	color: var(--t3);
 	font-size: 12px;
 	border-top: 1px solid var(--l1);
 }
-.jj-hd > span {
+.jj6-hd > span {
 	flex: none;
 	white-space: nowrap;
 	overflow: clip;
 }
-/* Sized like `.jj-msg`; the label starts where the descriptions do, past the lane bar. */
-.jj-hd > .jj-hd-msg {
+/* Sized like `.jj6-msg`; the label starts where the descriptions do, past the lane bar. */
+.jj6-hd > .jj6-hd-msg {
 	flex: 1 1 0;
 	width: 0;
 	box-sizing: border-box;
 	padding-left: 11px;
 }
-.jj-foot {
+.jj6-foot {
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -389,7 +424,7 @@
 	font-family: var(--sans);
 	font-size: 12px;
 }
-.jj-foot::before {
+.jj6-foot::before {
 	content: "";
 	width: 5px;
 	height: 5px;
@@ -398,7 +433,7 @@
 }
 
 /* The dock lines start where the rows' content does. */
-.jj-dock {
+.jj6-dock {
 	display: flex;
 	flex-direction: column;
 	padding: 0 10px 0 6px;

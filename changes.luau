@@ -10,6 +10,7 @@
 
 local ui = tern.ui
 local graph = require("./graph")
+local cls = graph.cls
 
 local LIMIT = 200
 local SEP = "\x1f"
@@ -465,7 +466,7 @@ local function pill(class: string, icon: string?, label: string, title: string?)
 		table.insert(kids, ui.node("icon", { name = icon }))
 	end
 	table.insert(kids, el("span", { text = label }))
-	return el("span", { class = "jj-pill " .. class, title = title }, kids)
+	return el("span", { class = cls("pill " .. class), title = title }, kids)
 end
 
 -- The ref column: bookmark and tag pills, then the connector toward the node.
@@ -473,35 +474,35 @@ local function refs_view(c: Change): Node
 	local kids: { Node } = {}
 	local here = has(c, "@")
 	for name in string.gmatch(c.bookmarks, "%S+") do
-		table.insert(kids, pill("jj-bm" .. (if here then " jj-here" else ""), if here then "check" else "branch", name))
+		table.insert(kids, pill("bm" .. (if here then " here" else ""), if here then "check" else "branch", name))
 	end
 	for name in string.gmatch(c.tags, "%S+") do
-		table.insert(kids, pill("jj-tag", "tag", name))
+		table.insert(kids, pill("tag", "tag", name))
 	end
 	if #kids > 0 then
-		table.insert(kids, el("span", { class = "jj-cline" }))
+		table.insert(kids, el("span", { class = cls("cline") }))
 	end
 	local props = fixed(REFS_W)
-	props.class = "jj-refs"
+	props.class = cls("refs")
 	return el("div", props, kids)
 end
 
 -- The message column: the lane's color bar, the working copy's pills, then the description.
 local function message_view(row: Row, c: Change): Node
-	local kids: { Node } = { el("span", { class = "jj-bar jj-l" .. graph.lane(row) }) }
+	local kids: { Node } = { el("span", { class = cls("bar l" .. graph.lane(row)) }) }
 	if has(c, "@") then
-		table.insert(kids, pill("jj-wc", "pen", "Working copy"))
+		table.insert(kids, pill("wc", "pen", "Working copy"))
 		local files, adds, dels = string.match(c.stat, "^(%d+) (%d+) (%d+)$")
 		if files and files ~= "0" then
-			table.insert(kids, pill("jj-stat", nil, files .. (if files == "1" then " file" else " files")))
+			table.insert(kids, pill("stat", nil, files .. (if files == "1" then " file" else " files")))
 			table.insert(kids, text({ ui.span("+" .. (adds :: string), "success num"), ui.span(" −" .. (dels :: string), "error num") }, { basis = "content" }))
 		end
 	end
 	if has(c, "c") then
-		table.insert(kids, pill("jj-conf", "warn", "conflict"))
+		table.insert(kids, pill("conf", "warn", "conflict"))
 	end
 	if has(c, "d") then
-		table.insert(kids, pill("jj-conf", "warn", "divergent"))
+		table.insert(kids, pill("conf", "warn", "divergent"))
 	end
 	local desc: { Span | string } = {}
 	if c.description ~= "" then
@@ -512,15 +513,15 @@ local function message_view(row: Row, c: Change): Node
 		table.insert(desc, ui.span(if has(c, "e") then "(empty)" else "(no description set)", "dim"))
 	end
 	table.insert(kids, text(desc, { grow = 1, truncate = "end" }))
-	return el("div", { class = "jj-msg", min = { w = MSG_W } }, kids)
+	return el("div", { class = cls("msg"), min = { w = MSG_W } }, kids)
 end
 
 local function id_view(c: Change): Node
 	local props = fixed(ID_W)
-	props.class = "jj-id"
+	props.class = cls("id")
 	props.title = c.short
 	return el("span", props, {
-		el("span", { class = "jj-idp", text = c.prefix }),
+		el("span", { class = cls("idp"), text = c.prefix }),
 		el("span", { text = c.rest }),
 	})
 end
@@ -533,12 +534,12 @@ local function row_view(state: State, row: Row, i: number, width: number): Node
 		if row.elided then
 			table.insert(kids, text({ ui.span("elided revisions", "dim") }, {}))
 		end
-		return el("div", { class = "jj-r jj-edge", key = "e" .. i }, kids)
+		return el("div", { class = cls("r edge"), key = "e" .. i }, kids)
 	end
 	local date = fixed(DATE_W)
-	date.class, date.text, date.title = "jj-date", c.date, if c.time ~= "" then c.time .. " · " .. c.author else nil
+	date.class, date.text, date.title = cls("date"), c.date, if c.time ~= "" then c.time .. " · " .. c.author else nil
 	return el("div", {
-		class = "jj-r jj-pick" .. (if c.commit == state.cursor then " jj-sel" else ""),
+		class = cls("r pick" .. (if c.commit == state.cursor then " sel" else "")),
 		key = c.commit,
 		actions = { click = "sel=" .. c.commit, dblclick = "open=" .. c.commit },
 	}, {
@@ -552,7 +553,7 @@ end
 
 local function button(icon: string, act: string, title: string, busy: boolean?): Node
 	return el("span", {
-		class = "jj-btn" .. (if busy then " jj-busy" else ""),
+		class = cls("btn" .. (if busy then " busy" else "")),
 		title = title,
 		actions = { click = act },
 	}, { ui.node("icon", { name = icon }) })
@@ -575,17 +576,17 @@ local function top_view(state: State, width: number): Node
 		table.insert(status, ui.span(state.notice.text, state.notice.tone))
 	end
 	local bar: { Node } = {
-		el("span", { class = "jj-where" }, where),
+		el("span", { class = cls("where") }, where),
 		button("repeat", "refresh", "Refresh (r)", state.loading),
 		button("fetch", "fetch", "Fetch from remotes (jj git fetch)", state.busy == "git fetch"),
-		el("span", { class = "jj-sep" }),
+		el("span", { class = cls("sep") }),
 		button("undo", "undo", "Undo the last operation (u)"),
 		button("redo", "redo", "Redo"),
-		el("span", { class = "jj-sep" }),
+		el("span", { class = cls("sep") }),
 		button("plus", "new", "New change on the selected one (n)"),
 		button("pen", "edit", "Edit the selected change (e)"),
 		button("diff", "diff", "Show the selected change's diff (⏎)"),
-		el("span", { class = "jj-grow" }),
+		el("span", { class = cls("grow") }),
 		text(status, { truncate = "end", max = { w = 0.5 } }),
 	}
 	local hd = fixed(REFS_W)
@@ -596,12 +597,12 @@ local function top_view(state: State, width: number): Node
 	hdate.text = "Date"
 	local hid = fixed(ID_W)
 	hid.text = "Change"
-	return el("div", { class = "jj-top", key = "top" }, {
-		el("div", { class = "jj-bar-row", max = { w = state.cx.cols .. "ch" } }, bar),
-		el("div", { class = "jj-r jj-hd" }, {
+	return el("div", { class = cls("top"), key = "top" }, {
+		el("div", { class = cls("bar-row"), max = { w = state.cx.cols .. "ch" } }, bar),
+		el("div", { class = cls("r hd") }, {
 			el("span", hd),
 			el("span", hg),
-			el("span", { class = "jj-hd-msg", text = "Description", min = { w = MSG_W } }),
+			el("span", { class = cls("hd-msg"), text = "Description", min = { w = MSG_W } }),
 			el("span", hdate),
 			el("span", hid),
 		}),
@@ -625,7 +626,7 @@ local function graph_view(state: State): { Node }
 	else
 		foot = #changes .. " changes in jj's default log revset"
 	end
-	table.insert(rows, el("div", { class = "jj-foot", key = "foot", text = foot }))
+	table.insert(rows, el("div", { class = cls("foot"), key = "foot", text = foot }))
 	return {
 		top_view(state, width),
 		-- `wrap` keeps every row mounted, so revealing the selection always finds it. The rows
@@ -720,7 +721,7 @@ local function dock_view(state: State): Node
 		end
 	end
 	table.insert(lines, ui.text({ ui.span("↑↓ move  ⏎ diff  @ working copy  n new  e edit  u undo  r refresh", "dim") }))
-	return ui.col({ ui.el("div", { class = "jj-dock" }, lines) })
+	return ui.col({ ui.el("div", { class = cls("dock") }, lines) })
 end
 
 -- Selects change `n` and scrolls its row into view.

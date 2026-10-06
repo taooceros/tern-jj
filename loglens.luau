@@ -7,6 +7,7 @@
 
 local ui = tern.ui
 local graph = require("./graph")
+local cls = graph.cls
 
 local MAX_ROWS = 5000
 
@@ -214,7 +215,7 @@ local function view(state: State): Node?
 			if r.note then
 				table.insert(kids, text({ ui.span(r.note, "dim") }))
 			end
-			table.insert(lines, ui.el("div", { class = "jj-r jj-edge" }, kids))
+			table.insert(lines, ui.el("div", { class = cls("r edge") }, kids))
 			continue
 		end
 		local desc: { Span | string } = {}
@@ -233,22 +234,22 @@ local function view(state: State): Node?
 		end
 		local kids: { Node } = {
 			g,
-			ui.el("span", { class = "jj-bar jj-l" .. graph.lane(grows[i]) }),
-			ui.el("span", { class = "jj-id" .. (if c.node == "@" then " jj-idp" else ""), text = c.change, min = { w = "9ch" }, max = { w = "9ch" } }),
+			ui.el("span", { class = cls("bar l" .. graph.lane(grows[i])) }),
+			ui.el("span", { class = cls("id" .. (if c.node == "@" then " idp" else "")), text = c.change, min = { w = "9ch" }, max = { w = "9ch" } }),
 		}
 		if c.refs ~= "root()" then
 			for name in string.gmatch(c.refs, "%S+") do
-				table.insert(kids, ui.el("span", { class = "jj-pill jj-bm" }, {
+				table.insert(kids, ui.el("span", { class = cls("pill bm") }, {
 					ui.node("icon", { name = "branch" }),
 					ui.el("span", { text = name }),
 				}))
 			end
 		end
 		table.insert(kids, text(desc, { grow = 1, truncate = "end" }))
-		table.insert(kids, ui.el("span", { class = "jj-date", text = string.sub(c.time, 6, 16), title = c.author, min = { w = "11ch" }, max = { w = "11ch" } }))
-		table.insert(kids, ui.el("span", { class = "jj-id", text = c.commit }))
+		table.insert(kids, ui.el("span", { class = cls("date"), text = string.sub(c.time, 6, 16), title = c.author, min = { w = "11ch" }, max = { w = "11ch" } }))
+		table.insert(kids, ui.el("span", { class = cls("id"), text = c.commit }))
 		table.insert(lines, ui.el("div", {
-			class = "jj-r jj-pick",
+			class = cls("r pick"),
 			actions = { click = "copy=" .. c.change },
 			title = "Click to copy the change ID",
 		}, kids))
