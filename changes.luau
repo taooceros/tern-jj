@@ -10,6 +10,7 @@
 
 local ui = tern.ui
 local graph = require("./graph")
+local avatars = require("./avatars")
 
 local LIMIT = 200
 -- Every visible change, not just jj's default log revset (mutable changes and trunk): the
@@ -137,6 +138,8 @@ type State = {
 	details: { [string]: Detail },
 	diff: boolean,
 	loading: boolean,
+	-- Blob ids of the authors' GitHub avatars by lowercased email; "" while loading or none.
+	photos: { [string]: string },
 	busy: string?,
 	notice: { tone: string, text: string }?,
 	problem: string?,
@@ -320,6 +323,23 @@ local function load_detail(state: State)
 	end
 end
 
+-- Asks for the GitHub avatar of every author not seen yet; each one that arrives is sent
+-- to the block as a blob and redraws it.
+local function load_photos(state: State)
+	for _, c in state.changes or {} do
+		local email = string.lower(c.email)
+		if email ~= "" and state.photos[email] == nil then
+			state.photos[email] = ""
+			avatars.load(email, function(image)
+				if alive(state) then
+					state.photos[email] = state.cx:blob(image.bytes, image.mime)
+					state.cx:render()
+				end
+			end)
+		end
+	end
+end
+
 -- Reloads the list, keeping the cursor on the same commit when it still exists,
 -- else on the working copy.
 local function refresh(state: State)
@@ -349,6 +369,7 @@ local function refresh(state: State)
 					state.cursor = state.cursor or (if changes[1] then changes[1].commit else nil)
 				end
 				load_detail(state)
+				load_photos(state)
 			end
 			state.cx:render()
 		end)
@@ -541,10 +562,14 @@ local function row_view(state: State, row: Row, i: number, width: number): Node
 	end
 	local date = fixed(DATE_W)
 	date.class, date.text, date.title = "jj-date", c.date, if c.time ~= "" then c.time .. " · " .. c.author else nil
+	local pick = { click = "sel=" .. c.commit, dblclick = "open=" .. c.commit }
+	local photo = if c.email ~= "" then state.photos[string.lower(c.email)] else nil
+	row.photo = if photo ~= "" then photo else nil
+	row.pick = pick
 	return el("div", {
 		class = "jj-r jj-pick" .. (if c.commit == state.cursor then " jj-sel" else ""),
 		key = c.commit,
-		actions = { click = "sel=" .. c.commit, dblclick = "open=" .. c.commit },
+		actions = pick,
 	}, {
 		refs_view(c),
 		graph.view(row, width),
@@ -786,6 +811,7 @@ local block: BlockDef<State> = {
 			details = {},
 			diff = false,
 			loading = false,
+			photos = {},
 			busy = nil,
 			notice = nil,
 			problem = nil,

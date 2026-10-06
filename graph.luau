@@ -43,7 +43,9 @@ export type Cell = { glyph: string, strokes: string, node: boolean, elided: bool
 
 -- A graph row: its cells; for a change, the node's kind, its author, the avatar's
 -- initials and color, and whether a ref pill on the left connects to the node.
--- `dot` (set by `link`) draws the node as a filled dot instead of an avatar.
+-- `dot` (set by `link`/`layout`) draws the node as a filled dot instead of an avatar.
+-- `photo` (a blob id, block only) draws the author's picture in the avatar instead of
+-- the initials, with `pick` as its actions so a click selects the row rather than zooming.
 export type GraphRow = {
 	cells: { Cell },
 	kind: string?,
@@ -52,6 +54,8 @@ export type GraphRow = {
 	avatar: number?,
 	connect: boolean?,
 	dot: boolean?,
+	photo: string?,
+	pick: { [string]: string }?,
 	-- Set by `link` on a junction row it moved onto a node: draw nothing for it.
 	hidden: boolean?,
 }
@@ -192,14 +196,15 @@ local function fold(rows: { GraphRow }, r: number, i: number): boolean
 end
 
 -- As in Tern's Git block, an avatar only where the author changes from the avatar or dot
--- above: the rest are dots. The working copy's ring and the root's diamond show no author, so
--- the next one does.
-local function faces(rows: { GraphRow })
+-- above, or (with `tips`, by row) at the top of a branch: the rest are dots. The working
+-- copy's ring and the root's diamond show no author, so the next one does.
+local function faces(rows: { GraphRow }, tips: { [number]: boolean }?)
 	local last: string? = nil
-	for _, row in rows do
+	for r, row in rows do
 		if row.kind then
 			local face = row.label ~= nil and row.kind ~= "wc"
-			row.dot = face and row.kind == "node" and row.author == last
+			local tip = tips ~= nil and tips[r] == true
+			row.dot = face and row.kind == "node" and row.author == last and not tip
 			last = if face then row.author else nil
 		end
 	end
@@ -310,17 +315,30 @@ type Place = { cell: Cell, lane: number, ends: { number }, news: { number }, top
 -- children stem from it at different lengths. Only rows with a node or `~` stay; jj's
 -- junction rows are hidden.
 function M.layout(rows: { GraphRow })
-	faces(rows)
 	local edges: { [string]: { string } } = {}
+	local parents: { [string]: boolean } = {}
 	for r, row in rows do
 		for i, c in row.cells do
 			if c.node or c.elided then
 				local out: { string } = {}
 				trace(rows, r + 1, i, "t", out, {})
 				edges[r .. ":" .. i] = out
+				for _, dest in out do
+					parents[dest] = true
+				end
 			end
 		end
 	end
+	-- A branch's top: a change no change above has as its parent.
+	local tips: { [number]: boolean } = {}
+	for r, row in rows do
+		for i, c in row.cells do
+			if c.node and not parents[r .. ":" .. i] then
+				tips[r] = true
+			end
+		end
+	end
+	faces(rows, tips)
 	local slots: { string | false } = {}
 	local places: { [number]: { Place } } = {}
 	local passing: { [number]: { [number]: boolean } } = {}
@@ -411,10 +429,11 @@ function M.layout(rows: { GraphRow })
 					local side = if t.lane > p.lane then "l" else "r"
 					local step = if t.lane > p.lane then 1 else -1
 					local corner = cells[2 * t.lane - 1]
-					-- A corner the run goes on past curves the same way; the run stays straight
-					-- on its far side.
+					-- A corner a farther lane's run goes on past: the curve joins the run, which
+					-- crosses the whole cell (a curve's rounded corner leaves the cell's center
+					-- bare, so a run starting there would show a gap).
 					if corner.strokes ~= "" then
-						corner.turn, corner.strokes = side .. t.v, if side == "l" then "r" else "l"
+						corner.turn, corner.strokes = side .. t.v, "lr"
 					else
 						corner.strokes = side .. t.v
 					end
@@ -470,6 +489,12 @@ local function node(row: GraphRow): Node
 	end
 	local label = row.label
 	if label and kind ~= "wc" then
+		local photo = row.photo
+		if photo then
+			return ui.el("span", { class = class .. " jj-av jj-ph" }, {
+				ui.node("image", { blob = photo, alt = row.author, w = 15, h = 15, role = "jj-face", actions = row.pick }),
+			})
+		end
 		return ui.el("span", { class = class .. " jj-av", text = label })
 	end
 	return ui.el("span", { class = class })

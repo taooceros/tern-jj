@@ -59,7 +59,9 @@ The block opens beside it, or focuses the one already open in the tab, and shows
 - every visible change (`jj log -r 'all()'`, the latest 200), not just jj's default log revset, as a native commit graph in the look of Tern's
   Git block: columns Bookmarks / Graph / Description / Date / Change, bookmark and tag pills
   on the left joined to their node by a hairline (the bookmark on the working copy is filled),
-  round author-initial avatars on the lanes where the author changes and dots for the rest, a lane-colored bar before the description,
+  round avatars on the lanes where the author changes and at the top of every branch, dots for
+  the rest; an avatar shows the author's GitHub picture when GitHub knows their email, else
+  their initials. A lane-colored bar before the description,
   muted dates, monospace change IDs with the unique prefix highlighted, a Working copy
   row with file-count pills, and a footer. Forks, merges and elided revisions follow jj's layout;
   the working copy is a ring, immutable changes diamonds, conflicts and divergence pills in red.
@@ -87,6 +89,11 @@ Homebrew, Cargo, Nix and zerobrew locations.
 
 - `host.luau`: host-side lens implementation; loads the block from `changes.luau`. Saving reloads it automatically.
 - `changes.luau`: the Jujutsu block.
+- `avatars.luau`: the authors' GitHub pictures for the block. It sends each author's email to
+  GitHub once per daemon: a noreply address to its account's picture, any other through
+  GitHub's email lookup (`avatars.githubusercontent.com/u/e?email=…`). GitHub's placeholder for
+  an unknown email, or no network, keeps the initials. The `jj log` lens has no images and
+  always shows initials.
 - `graph.luau` and `jj.css`: the native commit graph shared by the block and the log lens.
 - `loglens.luau`: the `jj`/`jj log` lens.
 - `window.luau`: the palette command and its ⌥⌘J binding.

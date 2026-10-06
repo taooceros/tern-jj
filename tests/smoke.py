@@ -26,8 +26,8 @@ with tempfile.TemporaryDirectory(prefix="tern-jj-", dir="/tmp") as temporary:
     subprocess.run(["jj", "git", "init", "--no-colocate", str(repo)], check=True, env=env)
     package = work / "package"
     package.mkdir()
-    for name in ("plugin.toml", "host.luau", "changes.luau", "graph.luau", "loglens.luau",
-                 "window.luau", "jj.css"):
+    for name in ("plugin.toml", "host.luau", "changes.luau", "graph.luau", "avatars.luau",
+                 "loglens.luau", "window.luau", "jj.css"):
         (package / name).write_bytes((ROOT / name).read_bytes())
     subprocess.run([TERN, "plugin", "install", str(package)], check=True, env=env)
     control = str(work / "control.sock")
