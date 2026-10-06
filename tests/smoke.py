@@ -26,7 +26,8 @@ with tempfile.TemporaryDirectory(prefix="tern-jj-", dir="/tmp") as temporary:
     subprocess.run(["jj", "git", "init", "--no-colocate", str(repo)], check=True, env=env)
     package = work / "package"
     package.mkdir()
-    for name in ("plugin.toml", "host.luau", "changes.luau", "window.luau"):
+    for name in ("plugin.toml", "host.luau", "changes.luau", "graph.luau", "loglens.luau",
+                 "window.luau", "jj.css"):
         (package / name).write_bytes((ROOT / name).read_bytes())
     subprocess.run([TERN, "plugin", "install", str(package)], check=True, env=env)
     control = str(work / "control.sock")
@@ -108,18 +109,30 @@ with tempfile.TemporaryDirectory(prefix="tern-jj-", dir="/tmp") as temporary:
                                       cwd=repo, env=env, check=True, text=True,
                                       capture_output=True).stdout.split()
 
+            def wait_text(selector, needle):
+                deadline = time.monotonic() + 15
+                while True:
+                    texts = [n.get("text", "") for n in ctl(f"tree {selector}")["nodes"]]
+                    if any(needle in t for t in texts):
+                        return texts
+                    assert time.monotonic() < deadline, (needle, texts)
+                    time.sleep(0.2)
+
+            ctl('run "jj log"')
+            wait_text(".sf-block[data-role='lens.plugin.jj.log']", "Jujutsu log")
+            print("PASS: jj log renders as a native graph card")
+
             ctl("key alt+cmd+j")
-            block = ".sf-main[data-surface='plugin.jj.changes']"
-            deadline = time.monotonic() + 15
-            while True:
-                texts = [n.get("text", "") for n in ctl(f"tree {block} .sf-card")["nodes"]]
-                if any("modified.txt" in t for t in texts):
-                    break
-                assert time.monotonic() < deadline, texts
-                time.sleep(0.2)
-            assert any("Renamed from before.txt" in t for t in texts), texts
+            surface = "[data-surface='plugin.jj.changes']"
+            wait_text(f".sf-main{surface} .jj-r", "(no description set)")
+            nodes = ctl(f"tree .sf-main{surface} .jj-n-wc")["nodes"]
+            assert len(nodes) == 1, nodes
+            wait_text(f".sf-dock{surface}", "modified.txt")
+            ctl("key enter")
+            wait_text(f".sf-layer{surface} .sf-card", "Renamed from before.txt")
             ctl("shot jj-changes")
-            print("PASS: the Jujutsu block lists changes and shows the working copy's files")
+            ctl("key escape")
+            print("PASS: the Jujutsu block draws the graph and shows the working copy's diff")
 
             before = jj_log("@")
             ctl("key n")

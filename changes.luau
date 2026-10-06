@@ -1,33 +1,39 @@
 --!strict
 -- The `changes` block: the repository's changes (jj's default log revset) as a
--- native list, the selected change's files as native diffs, and a few
--- one-key operations. Every operation is a plain `jj` command, so `u` (jj undo)
--- reverts any of them.
+-- native commit graph, the selected change's summary in the dock, its diff in a
+-- sheet, and a few one-key operations. Every operation is a plain `jj`
+-- command, so `u` (jj undo) reverts any of them.
 --
--- Keys: ↑/↓ (or k/j) move, g/G first/last, @ working copy, n new change on the
--- selected one, e edit it, u undo, r refresh.
+-- Keys: ↑/↓ (or k/j) move, g/G first/last, @ working copy, Enter (or d) show
+-- the diff, Esc close it, n new change on the selected one, e edit it, u undo,
+-- r refresh.
 
 local ui = tern.ui
+local graph = require("./graph")
 
 local LIMIT = 200
 local SEP = "\x1f"
 local REC = "\x1e"
-local LIST_ID = "main.changes."
+local ROW_ID = "main.graph."
 local MAX_DIFF_BYTES = 512 * 1024
+local SUMMARY_FILES = 6
 
--- One record per change; fields are joined by \x1f and records end with \x1e,
--- so descriptions and names never need escaping.
-local LOG_TEMPLATE = table.concat({
-	"commit_id",
-	"change_id.shortest(8).prefix()",
-	"change_id.shortest(8).rest()",
-	"commit_id.short(8)",
-	"description.first_line()",
-	"author.name()",
-	"committer.timestamp().ago()",
-	"local_bookmarks.map(|b| b.name()).join(\" \")",
-	"concat(if(current_working_copy, \"@\"), if(empty, \"e\"), if(conflict, \"c\"), if(immutable, \"i\"), if(divergent, \"d\"))",
-}, ' ++ "\\x1f" ++ ') .. ' ++ "\\x1e"'
+-- jj draws the graph; each change's record follows its node glyph after \x1e,
+-- with fields joined by \x1f, so descriptions and names never need escaping.
+local LOG_TEMPLATE = '"\\x1e" ++ '
+	.. table.concat({
+		"commit_id",
+		"change_id.shortest(8).prefix()",
+		"change_id.shortest(8).rest()",
+		"commit_id.short(8)",
+		"description.first_line()",
+		"author.name()",
+		"committer.timestamp().ago()",
+		"local_bookmarks.map(|b| b.name()).join(\" \")",
+		"concat(if(current_working_copy, \"@\"), if(empty, \"e\"), if(conflict, \"c\"), if(immutable, \"i\"), if(divergent, \"d\"))",
+		"tags.map(|t| t.name()).join(\" \")",
+	}, ' ++ "\\x1f" ++ ')
+	.. ' ++ "\\n"'
 
 -- `jj` by name first, then where package managers put it: the daemon may run
 -- with a PATH that lacks those directories.
@@ -89,7 +95,11 @@ type Change = {
 	ago: string,
 	bookmarks: string,
 	flags: string,
+	tags: string,
 }
+
+-- A graph row: a change, an edge row (`├─╮`) or elided revisions (`~`).
+type Row = graph.GraphRow & { change: Change?, elided: boolean }
 
 type FileDiff = {
 	path: string,
@@ -109,8 +119,10 @@ type State = {
 	cwd: string?,
 	root: string?,
 	changes: { Change }?,
+	rows: { Row },
 	cursor: string?,
 	details: { [string]: Detail },
+	diff: boolean,
 	loading: boolean,
 	busy: string?,
 	notice: { tone: string, text: string }?,
@@ -136,29 +148,54 @@ local function first_line(text: string): string
 	return string.match(text, "^%s*([^\n]*)") or ""
 end
 
-local function parse_log(stdout: string): { Change }
-	local changes: { Change } = {}
-	for record in string.gmatch(stdout, "([^" .. REC .. "]+)") do
-		local f = string.split(record, SEP)
-		if #f >= 9 then
-			table.insert(changes, {
-				commit = string.match(f[1], "%x+") or f[1],
-				prefix = f[2],
-				rest = f[3],
-				short = f[4],
-				description = f[5],
-				author = f[6],
-				ago = f[7],
-				bookmarks = f[8],
-				flags = f[9],
-			})
-		end
-	end
-	return changes
-end
-
 local function has(change: Change, flag: string): boolean
 	return string.find(change.flags, flag, 1, true) ~= nil
+end
+
+local function kind_of(change: Change): string
+	return if has(change, "@") then "wc"
+		elseif has(change, "c") then "conflict"
+		elseif has(change, "i") then "immutable"
+		else "node"
+end
+
+-- The graph rows and changes of `jj log -T LOG_TEMPLATE` output.
+local function parse_log(stdout: string): ({ Row }, { Change })
+	local rows: { Row } = {}
+	local changes: { Change } = {}
+	for line in string.gmatch(stdout, "([^\n]*)\n?") do
+		local at = string.find(line, REC, 1, true)
+		local prefix = if at then string.sub(line, 1, at - 1) else line
+		local rest = if at then string.sub(line, at + 1) else ""
+		local elided = not at and string.find(line, "(elided revisions)", 1, true) ~= nil
+		if elided then
+			prefix = string.sub(line, 1, (string.find(line, "(elided revisions)", 1, true) :: number) - 1)
+		end
+		local cells = graph.cells(prefix)
+		if at then
+			local f = string.split(rest, SEP)
+			if #f >= 10 then
+				local change: Change = {
+					commit = f[1],
+					prefix = f[2],
+					rest = f[3],
+					short = f[4],
+					description = f[5],
+					author = f[6],
+					ago = f[7],
+					bookmarks = f[8],
+					flags = f[9],
+					tags = f[10],
+				}
+				table.insert(changes, change)
+				table.insert(rows, { cells = cells, kind = kind_of(change), change = change, elided = false })
+			end
+		elseif #cells > 0 then
+			table.insert(rows, { cells = cells, kind = nil, change = nil, elided = elided })
+		end
+	end
+	graph.link(rows)
+	return rows, changes
 end
 
 -- Splits `jj diff --git` output into one entry per file.
@@ -263,7 +300,8 @@ local function refresh(state: State)
 	end
 	state.loading = true
 	local function load_log()
-		local spawn_error = jj({ "log", "--no-graph", "--limit", tostring(LIMIT), "-T", LOG_TEMPLATE }, state.root, function(result)
+		local args = { "log", "--config", "ui.graph.style=curved", "--limit", tostring(LIMIT), "-T", LOG_TEMPLATE }
+		local spawn_error = jj(args, state.root, function(result)
 			if not alive(state) then
 				return
 			end
@@ -271,8 +309,8 @@ local function refresh(state: State)
 			if result.status ~= 0 then
 				state.problem = first_line(result.stderr)
 			else
-				local changes = parse_log(result.stdout)
-				state.changes, state.problem = changes, nil
+				local rows, changes = parse_log(result.stdout)
+				state.rows, state.changes, state.problem = rows, changes, nil
 				if index_of(state) == 0 then
 					state.cursor = nil
 					for _, c in changes do
@@ -361,58 +399,92 @@ local function with(node: Node, props: { [string]: any }): Node
 	return node
 end
 
-local function list_view(state: State): Node
-	local changes: { Change } = state.changes or {}
-	local items: { Item } = {}
-	for _, c in changes do
-		local label: { Span | string } = {
-			ui.span(if has(c, "@") then "@ " else "  ", "accent strong"),
-			ui.span(c.prefix, "accent strong"),
-			ui.span(c.rest .. "  ", "muted"),
-		}
-		if c.bookmarks ~= "" then
-			table.insert(label, ui.span(c.bookmarks .. "  ", "info"))
-		end
-		if has(c, "c") then
-			table.insert(label, ui.span("conflict  ", "error"))
-		end
-		if c.description ~= "" then
-			table.insert(label, ui.span(c.description, if has(c, "i") then "muted" else nil))
-		else
-			table.insert(label, ui.span(if has(c, "e") then "(empty)" else "(no description set)", "warning"))
-		end
-		table.insert(items, {
-			label = label,
-			value = { ui.span(c.author .. "  ", "muted"), ui.span(c.ago, "muted num") },
-			icon = if has(c, "i") then "lock" else "commit",
-			tone = if has(c, "c") then "error" elseif has(c, "@") then "accent" else nil,
-		})
+local function text(spans: { Span | string }, props: { [string]: any }): Node
+	local node = ui.text(spans)
+	local p: { [string]: any } = node.p or {}
+	p.wrap = "none"
+	for k, v in props do
+		p[k] = v
 	end
-	local list = ui.list(items)
-	local kids = list.c or {}
-	for i, c in changes do
-		with(kids[i], { key = c.commit })
+	node.p = p
+	return node
+end
+
+local function description_spans(c: Change): { Span | string }
+	local spans: { Span | string } = {}
+	if has(c, "c") then
+		table.insert(spans, ui.span("conflict ", "error"))
 	end
-	return with(list, {
-		key = "changes",
-		selected = if state.cursor then LIST_ID .. state.cursor else nil,
-		empty = { ui.span("No changes in jj's default log revset.", "muted") },
-		max = { lines = math.max(5, math.floor(state.cx.rows * 0.35)) },
-	})
+	if has(c, "d") then
+		table.insert(spans, ui.span("divergent ", "error"))
+	end
+	if c.description ~= "" then
+		table.insert(spans, ui.span(c.description, if has(c, "@") then "strong" elseif has(c, "i") then "muted" else nil))
+	elseif c.commit == string.rep("0", #c.commit) then
+		table.insert(spans, ui.span("root()", "success"))
+	else
+		table.insert(spans, ui.span(if has(c, "e") then "(empty)" else "(no description set)", if has(c, "e") then "success" else "warning"))
+	end
+	return spans
+end
+
+-- One row of the graph: jj's lanes, then the change like a line of `jj log`.
+local function row_view(state: State, row: Row, i: number, width: number): Node
+	local kids: { Node } = { graph.view(row, width) }
+	local c = row.change
+	if not c then
+		if row.elided then
+			table.insert(kids, text({ ui.span("elided revisions", "dim") }, {}))
+		end
+		return ui.el("div", { class = "jj-r jj-edge", key = "e" .. i }, kids)
+	end
+	table.insert(kids, text({
+		ui.span(c.prefix, if has(c, "@") then "accent strong" else "accent"),
+		ui.span(c.rest, "dim"),
+	}, { basis = "content" }))
+	for name in string.gmatch(c.bookmarks, "%S+") do
+		table.insert(kids, ui.badge(name, "info"))
+	end
+	for name in string.gmatch(c.tags, "%S+") do
+		table.insert(kids, ui.badge(name, "warning"))
+	end
+	table.insert(kids, text(description_spans(c), { grow = 1, truncate = "end" }))
+	table.insert(kids, text({ ui.span(c.author, "muted") }, { basis = "content", truncate = "end", max = { w = "16ch" } }))
+	table.insert(kids, text({ ui.span(c.ago, "muted") }, { basis = "content" }))
+	table.insert(kids, text({ ui.span(c.short, "info") }, { basis = "content" }))
+	return ui.el("div", {
+		class = "jj-r jj-pick" .. (if c.commit == state.cursor then " jj-sel" else ""),
+		key = c.commit,
+		actions = { click = "sel=" .. c.commit, dblclick = "open=" .. c.commit },
+	}, kids)
+end
+
+local function graph_view(state: State): Node
+	local rows: { Node } = {}
+	local width = graph.width(state.rows)
+	for i, row in state.rows do
+		table.insert(rows, row_view(state, row, i, width))
+	end
+	if #rows == 0 then
+		table.insert(rows, ui.text({ ui.span("No changes in jj's default log revset.", "muted") }))
+	end
+	-- `wrap` keeps every row mounted, so revealing the selection always finds it.
+	return ui.node("col", { key = "graph", gap = "none", wrap = true }, rows)
 end
 
 local KIND_TONE = { A = "success", D = "error", R = "warning", M = "warning" }
 
-local function detail_view(state: State): Node?
-	local change = selected(state)
-	if not change then
-		return nil
-	end
-	local head: { Span | string } = {
-		ui.span(change.prefix, "accent strong"),
-		ui.span(change.rest .. " ", "muted"),
-		ui.span(change.short, "info"),
+local function file_head(state: State, f: FileDiff): { Span | string }
+	return {
+		ui.span(f.kind .. " ", KIND_TONE[f.kind] or "muted"),
+		ui.path(f.path, state.root),
+		ui.span("  +" .. f.adds, "success num"),
+		ui.span(" −" .. f.dels, "error num"),
 	}
+end
+
+-- The diff sheet: one collapsible card per file.
+local function diff_layer(state: State, change: Change): Node
 	local children: { Node } = {}
 	local detail = state.details[change.commit]
 	if not detail or (not detail.files and not detail.error) then
@@ -423,12 +495,6 @@ local function detail_view(state: State): Node?
 		table.insert(children, ui.text({ ui.span("This change has no file changes.", "muted") }))
 	elseif detail.files then
 		for _, f in detail.files do
-			local fhead: { Span | string } = {
-				ui.span(f.kind .. " ", KIND_TONE[f.kind] or "muted"),
-				ui.path(f.path, state.root),
-				ui.span("  +" .. f.adds, "success num"),
-				ui.span(" −" .. f.dels, "error num"),
-			}
 			-- A rename, mode change or binary file has no hunks: `diff` would draw its headers as lines.
 			local body = if f.hunks
 				then ui.diff(f.text, f.path)
@@ -440,17 +506,57 @@ local function detail_view(state: State): Node?
 						"muted"
 					),
 				})
-			table.insert(children, with(ui.card(fhead, { body }), {
+			table.insert(children, with(ui.card(file_head(state, f), { body }), {
 				key = "f:" .. f.path,
 				collapsible = true,
 			}))
 		end
 	end
-	return with(ui.section(head, children), { key = "detail" })
+	table.insert(children, ui.text({ ui.span("↑↓ next change  esc close", "dim") }))
+	local head: { Span | string } = {
+		ui.span(change.prefix, "accent strong"),
+		ui.span(change.rest .. "  ", "dim"),
+		ui.span(change.short .. "  ", "info"),
+	}
+	for _, s in description_spans(change) do
+		table.insert(head, s)
+	end
+	return ui.col({
+		ui.node("overlay", { key = "diff", head = head, size = "full", modal = true }, children),
+	})
 end
 
+-- The dock: the selected change's summary, then the operations.
 local function dock_view(state: State): Node
 	local lines: { Node } = {}
+	local c = selected(state)
+	if c then
+		local head: { Span | string } = {
+			ui.span(c.prefix, "accent strong"),
+			ui.span(c.rest .. "  ", "dim"),
+			ui.span(c.short .. "  ", "info"),
+		}
+		if c.author ~= "" then
+			table.insert(head, ui.span(c.author .. " · " .. c.ago .. "  ", "muted"))
+		end
+		for _, s in description_spans(c) do
+			table.insert(head, s)
+		end
+		table.insert(lines, text(head, { truncate = "end" }))
+		local detail = state.details[c.commit]
+		local files = detail and detail.files
+		if files then
+			for n, f in files do
+				if n > SUMMARY_FILES then
+					table.insert(lines, text({ ui.span("… " .. (#files - SUMMARY_FILES) .. " more files", "dim") }, {}))
+					break
+				end
+				table.insert(lines, text(file_head(state, f), { truncate = "start" }))
+			end
+		elseif detail and detail.error then
+			table.insert(lines, text({ ui.span(detail.error, "error") }, { truncate = "end" }))
+		end
+	end
 	local status: { Span | string } = {}
 	if state.busy then
 		table.insert(status, ui.span("jj " .. state.busy .. "…", "muted"))
@@ -459,29 +565,43 @@ local function dock_view(state: State): Node
 	elseif state.root then
 		table.insert(status, ui.span(state.root, "muted"))
 	end
+	table.insert(lines, ui.node("spacer", {}))
 	table.insert(lines, ui.row({
-		button("New", "new", "accent"),
+		button("Diff", "diff", "accent"),
+		button("New", "new", "neutral"),
 		button("Edit", "edit", "neutral"),
 		button("Undo", "undo", "neutral"),
 		button("Refresh", "refresh", "neutral"),
 		with(ui.text(status), { grow = 1, truncate = "end" }),
 	}))
-	table.insert(lines, ui.text({ ui.span("↑↓ move  @ working copy  n new  e edit  u undo  r refresh", "dim") }))
+	table.insert(lines, ui.text({ ui.span("↑↓ move  ⏎ diff  @ working copy  n new  e edit  u undo  r refresh", "dim") }))
 	return ui.col({ ui.lines(lines) })
 end
 
+-- Selects change `n` and scrolls its row into view.
 local function move(state: State, to: number)
 	local changes = state.changes or {}
 	local c = changes[math.clamp(to, 1, math.max(1, #changes))]
 	if c then
 		state.cursor = c.commit
 		load_detail(state)
+		state.cx:frame({ { "reveal", ROW_ID .. c.commit, "nearest" } })
 	end
 end
 
-local function act(state: State, name: string): boolean
+local function act(state: State, name: string, value: string?): boolean
 	local change = selected(state)
-	if name == "refresh" then
+	if name == "sel" and value then
+		state.cursor = value
+		load_detail(state)
+	elseif name == "open" and value then
+		state.cursor, state.diff = value, true
+		load_detail(state)
+	elseif name == "diff" then
+		state.diff = change ~= nil
+	elseif name == "close" then
+		state.diff = false
+	elseif name == "refresh" then
 		refresh(state)
 	elseif name == "undo" then
 		operate(state, "undo", { "undo" })
@@ -506,8 +626,10 @@ local block: BlockDef<State> = {
 			cwd = args[1] or cx.cwd,
 			root = nil,
 			changes = nil,
+			rows = {},
 			cursor = nil,
 			details = {},
+			diff = false,
 			loading = false,
 			busy = nil,
 			notice = nil,
@@ -535,12 +657,12 @@ local block: BlockDef<State> = {
 			end
 			return { main = ui.col({ ui.progress(nil, "Reading the repository…") }) }
 		end
-		local main: { Node } = { list_view(state) }
-		local detail = detail_view(state)
-		if detail then
-			table.insert(main, detail)
-		end
-		return { main = ui.col(main), dock = dock_view(state) }
+		local change = selected(state)
+		return {
+			main = ui.col({ graph_view(state) }),
+			dock = dock_view(state),
+			layer = if state.diff and change then diff_layer(state, change) else nil,
+		}
 	end,
 
 	key = function(state: State, key: Key, _cx: BlockCx): boolean?
@@ -561,6 +683,13 @@ local block: BlockDef<State> = {
 			move(state, 1)
 		elseif key.name == "end" or k == "G" then
 			move(state, #(state.changes or {}))
+		elseif key.name == "enter" or k == "d" or k == "o" then
+			act(state, "diff")
+		elseif key.name == "escape" or k == "q" then
+			if not state.diff then
+				return false
+			end
+			act(state, "close")
 		elseif k == "@" then
 			local changes: { Change } = state.changes or {}
 			for n, c in changes do
@@ -584,10 +713,7 @@ local block: BlockDef<State> = {
 
 	event = function(state: State, ev: UiEvent, _cx: BlockCx)
 		if ev.ev == "action" and type(ev.act) == "string" then
-			act(state, ev.act)
-		elseif ev.ev == "select" and type(ev.item) == "string" then
-			state.cursor = string.sub(ev.item, #LIST_ID + 1)
-			load_detail(state)
+			act(state, ev.act, if type(ev.value) == "string" then ev.value else nil)
 		end
 	end,
 }

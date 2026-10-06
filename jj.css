@@ -1,0 +1,105 @@
+/* The commit graph (graph.luau): each cell draws strokes from its center. */
+.jj-r {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 0 8px 0 4px;
+	min-height: calc(var(--sf-lh, 1.4em) + 6px);
+	border-radius: 6px;
+}
+.jj-r.jj-edge {
+	min-height: calc(var(--sf-lh, 1.4em) * 0.75);
+}
+.jj-r.jj-pick {
+	cursor: default;
+}
+.jj-r.jj-pick:hover {
+	background: var(--l1);
+}
+.jj-r.jj-sel {
+	background: var(--sf-sel, var(--l2));
+	box-shadow: inset 2px 0 0 var(--accent);
+}
+.jj-g {
+	display: flex;
+	align-self: stretch;
+	flex: none;
+	position: relative;
+	z-index: 0;
+	isolation: isolate;
+}
+.jj-gs {
+	display: block;
+}
+.jj-gc {
+	position: relative;
+	display: block;
+	flex: none;
+	--lane: var(--sf-c-accent, var(--accent));
+}
+.jj-l1 { --lane: var(--sf-c-success, #3fb950); }
+.jj-l2 { --lane: var(--sf-c-warning, #d29922); }
+.jj-l3 { --lane: var(--sf-c-info, #58a6ff); }
+.jj-l4 { --lane: var(--sf-c-error, #f85149); }
+.jj-l5 { --lane: var(--sf-c-muted, #8b949e); }
+.jj-st::before,
+.jj-sb::before {
+	content: "";
+	position: absolute;
+	left: calc(50% - 1px);
+	width: 2px;
+	top: 50%;
+	bottom: 50%;
+	background: var(--lane);
+}
+.jj-st::before { top: 0; }
+.jj-sb::before { bottom: 0; }
+.jj-el::before {
+	background: none;
+	border-left: 2px dotted var(--lane);
+	width: 0;
+}
+.jj-sl::after,
+.jj-sr::after {
+	content: "";
+	position: absolute;
+	top: calc(50% - 1px);
+	height: 2px;
+	left: 50%;
+	right: 50%;
+	background: var(--lane);
+}
+.jj-sl::after { left: 0; }
+.jj-sr::after { right: 0; }
+.jj-n {
+	position: absolute;
+	z-index: 1;
+	left: 50%;
+	top: 50%;
+	width: 9px;
+	height: 9px;
+	margin: -4.5px 0 0 -4.5px;
+	border-radius: 50%;
+	box-sizing: border-box;
+	border: 2px solid var(--lane);
+	background: var(--bg, var(--card));
+}
+.jj-n-wc {
+	width: 13px;
+	height: 13px;
+	margin: -6.5px 0 0 -6.5px;
+	border-color: var(--accent);
+	box-shadow: inset 0 0 0 2px var(--bg, var(--card)), inset 0 0 0 6px var(--accent);
+}
+.jj-n-immutable {
+	border-radius: 1px;
+	transform: rotate(45deg);
+	background: var(--lane);
+}
+.jj-n-conflict {
+	border-color: var(--bad, var(--sf-c-error));
+	background: var(--bad, var(--sf-c-error));
+}
+.jj-n-hidden {
+	border-style: dashed;
+}

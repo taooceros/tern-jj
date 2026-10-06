@@ -40,8 +40,9 @@ captured by this lens and retain their normal output.
 ### Log lens
 
 `jj` and `jj log` (with any revset or limit) render as a native "Jujutsu log" card:
-the graph, change ID, flags (conflict, divergent, empty), description, bookmarks and tags,
-author, time and commit ID, one row per change. Click a row to copy its change ID.
+the commit graph drawn natively (see below), change ID, flags (conflict, divergent, empty),
+bookmarks and tags, description, author, time and commit ID, one row per change.
+Click a row to copy its change ID.
 Output in another format (`-T`/`--template`, `--no-graph`, `-p`, `-s`, `--stat`, …),
 errors, and output the lens can't read stay raw.
 
@@ -50,12 +51,19 @@ errors, and output the lens can't read stay raw.
 Run **Open Jujutsu changes** from the palette (⌥⌘J) in a pane inside a jj repository.
 The block opens beside it, or focuses the one already open in the tab, and shows:
 
-- jj's default log revset (up to 200 changes) as a native list: change ID with its
-  unique prefix highlighted, local bookmarks, description, author and age. `@` marks
-  the working copy, a lock icon immutable changes, red rows conflicts.
-- the selected change's files as native diffs (`jj diff --git`), one collapsible card per file.
+- jj's default log revset (up to 200 changes) as a native commit graph, like Tern's Git
+  block: lanes, forks, merges and elided revisions, with the working copy as a ring,
+  immutable changes as diamonds and conflicts in red. Each row shows the change ID with
+  its unique prefix highlighted, bookmark and tag badges, description, author, age and commit ID.
+- the selected change's summary and files (kind, path, `+`/`−` counts) in the dock.
+- its diff in a full-height sheet (`Enter`, `d`, the Diff button or a double-click), one
+  collapsible card per file; `↑`/`↓` move to the next change with the sheet open, `Esc` closes it.
 - keys: `↑`/`↓` (or `k`/`j`), `g`/`G`, `@` (jump to the working copy), `n` (`jj new` on the
   selected change), `e` (`jj edit`), `u` (`jj undo`), `r` (refresh). The dock has buttons for the same operations.
+
+The graph is jj's own layout (`ui.graph.style=curved`): `graph.luau` reads each graph
+character as strokes from its cell's center, and `jj.css` draws them, so lanes stay
+continuous whatever the row height.
 
 Every operation is a plain `jj` command, so `u` reverts any of them. The block reloads
 after every `jj` command that finishes in a Tern pane. Outside a repository it shows
@@ -66,6 +74,7 @@ Homebrew, Cargo, Nix and zerobrew locations.
 
 - `host.luau`: host-side lens implementation; loads the block from `changes.luau`. Saving reloads it automatically.
 - `changes.luau`: the Jujutsu block.
+- `graph.luau` and `jj.css`: the native commit graph shared by the block and the log lens.
 - `loglens.luau`: the `jj`/`jj log` lens.
 - `window.luau`: the palette command and its ⌥⌘J binding.
 - `plugin.toml`: declares the entry points, the block and the command patterns to capture.

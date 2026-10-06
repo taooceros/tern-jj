@@ -1,29 +1,24 @@
 --!strict
 -- The `log` lens: `jj` and `jj log` in jj's default (compact, graph) format as
--- native rows, one per change: graph, change ID, description, refs, author,
--- time and commit ID. A click copies the change ID. Output in any other
--- format (a custom template, --no-graph, patches, stats) stays raw.
+-- native rows, one per change: the commit graph (drawn by graph.luau), change
+-- ID, refs, description, author, time and commit ID. A click copies the change
+-- ID. Output in any other format (a custom template, --no-graph, patches,
+-- stats) stays raw.
 
 local ui = tern.ui
+local graph = require("./graph")
 
 local MAX_ROWS = 5000
-local NBSP = "\u{00A0}"
 
 -- Glyphs jj's curved/square graph styles draw; node glyphs mark a change's line.
 local GRAPH: { [string]: boolean } = {}
 for _, g in { "│", "├", "┤", "─", "╮", "╯", "╭", "╰", "┼", "┬", "┴", "~", " " } do
 	GRAPH[g] = true
 end
-local NODES: { [string]: string } = {
-	["@"] = "success strong",
-	["○"] = "muted",
-	["◆"] = "info",
-	["×"] = "error strong",
-	["◉"] = "muted",
-	["●"] = "muted",
-	["◌"] = "dim",
-	["⊕"] = "muted",
-}
+local NODES: { [string]: boolean } = {}
+for _, g in { "@", "○", "◆", "×", "◉", "●", "◌", "⊕" } do
+	NODES[g] = true
+end
 for g in NODES do
 	GRAPH[g] = true
 end
@@ -171,35 +166,6 @@ local function feed(state: State, text: string)
 	end
 end
 
-local function rtrim(s: string): string
-	return (string.gsub(s, "%s+$", ""))
-end
-
-local function graph_spans(graph: string, width: number): { Span | string }
-	local spans: { Span | string } = {}
-	local run = ""
-	local n = 0
-	for _, cp in utf8.codes(graph) do
-		local ch = utf8.char(cp)
-		n += 1
-		local tone = NODES[ch]
-		if tone then
-			if run ~= "" then
-				table.insert(spans, ui.span(run, "dim"))
-				run = ""
-			end
-			table.insert(spans, ui.span(ch, tone))
-		else
-			run ..= if ch == " " then NBSP else ch
-		end
-	end
-	run ..= string.rep(NBSP, width - n)
-	if run ~= "" then
-		table.insert(spans, ui.span(run, "dim"))
-	end
-	return spans
-end
-
 local function text(spans: { Span | string }, props: { [string]: any }?): Node
 	local node = ui.text(spans)
 	local p: { [string]: any } = node.p or {}
@@ -212,13 +178,29 @@ local function text(spans: { Span | string }, props: { [string]: any }?): Node
 	return node
 end
 
+local function kind_of(c: Change, cells: { graph.Cell }): string
+	for _, flag in c.flags do
+		if flag == "conflict" then
+			return "conflict"
+		end
+	end
+	return graph.glyph_kind(cells) or "node"
+end
+
 local function view(state: State): Node?
 	if state.failed or state.declined or state.status ~= 0 or #state.rows == 0 then
 		return nil
 	end
-	local width, author_w, time_w = 0, 0, 0
+	local grows: { graph.GraphRow } = {}
+	for i, r in state.rows do
+		local cells = graph.cells(r.graph)
+		local c = r.change
+		grows[i] = { cells = cells, kind = if c then kind_of(c, cells) else nil }
+	end
+	graph.link(grows)
+	local width = graph.width(grows)
+	local author_w, time_w = 0, 0
 	for _, r in state.rows do
-		width = math.max(width, utf8.len(rtrim(r.graph)) or 0)
 		local c = r.change
 		if c then
 			author_w = math.max(author_w, utf8.len(c.author) or 0)
@@ -226,15 +208,15 @@ local function view(state: State): Node?
 		end
 	end
 	local lines: { Node } = {}
-	for _, r in state.rows do
-		local g = text(graph_spans(rtrim(r.graph), width + 1), { basis = "content" })
+	for i, r in state.rows do
+		local g = graph.view(grows[i], width)
 		local c = r.change
 		if not c then
 			local kids = { g }
 			if r.note then
 				table.insert(kids, text({ ui.span(r.note, "dim") }))
 			end
-			table.insert(lines, ui.node("row", { gap = "none" }, kids))
+			table.insert(lines, ui.el("div", { class = "jj-r jj-edge" }, kids))
 			continue
 		end
 		local desc: { Span | string } = {}
@@ -254,16 +236,22 @@ local function view(state: State): Node?
 		local kids: { Node } = {
 			g,
 			text({ ui.span(c.change, if c.node == "@" then "accent strong" else "accent") }, { basis = "content" }),
-			text(desc, { grow = 1, truncate = "end" }),
 		}
-		if c.refs ~= "" and c.refs ~= "root()" then
-			table.insert(kids, text({ ui.span(c.refs, "info strong") }, { basis = "content" }))
+		if c.refs ~= "root()" then
+			for name in string.gmatch(c.refs, "%S+") do
+				table.insert(kids, ui.badge(name, "info"))
+			end
 		end
-		table.insert(kids, text({ ui.span(c.author, "muted") }, { min = { w = author_w .. "ch" } }))
+		table.insert(kids, text(desc, { grow = 1, truncate = "end" }))
+		table.insert(kids, text({ ui.span(c.author, "muted") }, {
+			min = { w = math.min(author_w, 14) .. "ch" },
+			max = { w = "24ch" },
+			truncate = "end",
+		}))
 		table.insert(kids, text({ ui.span(c.time, "muted num") }, { min = { w = time_w .. "ch" } }))
 		table.insert(kids, text({ ui.span(c.commit, "info") }, { basis = "content" }))
-		table.insert(lines, ui.node("row", {
-			gap = "md",
+		table.insert(lines, ui.el("div", {
+			class = "jj-r jj-pick",
 			actions = { click = "copy=" .. c.change },
 			title = "Click to copy the change ID",
 		}, kids))
