@@ -1,5 +1,5 @@
 --!strict
--- The `changes` block: the repository's changes (jj's default log revset) as a
+-- The `changes` block: every visible change in the repository (`all()`, up to `LIMIT`) as a
 -- native commit graph, the selected change's summary in the dock, its diff in a
 -- sheet, and a few one-key operations. Every operation is a plain `jj`
 -- command, so `u` (jj undo) reverts any of them.
@@ -12,6 +12,9 @@ local ui = tern.ui
 local graph = require("./graph")
 
 local LIMIT = 200
+-- Every visible change, not just jj's default log revset (mutable changes and trunk): the
+-- whole history, as in Tern's Git block, newest first.
+local REVSET = "all()"
 local SEP = "\x1f"
 local REC = "\x1e"
 local ROW_ID = "main.graph."
@@ -325,7 +328,7 @@ local function refresh(state: State)
 	end
 	state.loading = true
 	local function load_log()
-		local args = { "log", "--config", "ui.graph.style=curved", "--limit", tostring(LIMIT), "-T", LOG_TEMPLATE }
+		local args = { "log", "-r", REVSET, "--config", "ui.graph.style=curved", "--limit", tostring(LIMIT), "-T", LOG_TEMPLATE }
 		local spawn_error = jj(args, state.root, function(result)
 			if not alive(state) then
 				return
@@ -620,13 +623,13 @@ local function graph_view(state: State): { Node }
 	local changes = state.changes or {}
 	local foot: string
 	if #changes == 0 then
-		foot = "No changes in jj's default log revset"
+		foot = "No changes"
 	elseif #changes >= LIMIT then
 		foot = "Showing the latest " .. LIMIT .. " changes"
 	elseif changes[#changes].date == "" then
 		foot = "Beginning of history · " .. #changes .. " changes"
 	else
-		foot = #changes .. " changes in jj's default log revset"
+		foot = #changes .. " changes"
 	end
 	table.insert(rows, el("div", { class = "jj-foot", key = "foot", text = foot }))
 	return {
