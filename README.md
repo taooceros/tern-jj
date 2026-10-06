@@ -72,9 +72,7 @@ The block opens beside it, or focuses the one already open in the tab, and shows
 The graph is jj's own layout (`ui.graph.style=curved`): `graph.luau` reads each graph
 character as strokes from its cell's center, and `jj.css` draws them, so lanes stay
 continuous whatever the row height. Corners and the branches leaving a lane turn in
-curves, as in Tern's Git block. Every class carries a versioned prefix (`graph.P`, and
-the same in `jj.css`), so an older copy of the stylesheet sent by an attached remote host
-cannot restyle the views.
+curves, as in Tern's Git block.
 
 Every operation is a plain `jj` command, so `u` reverts any of them. The block reloads
 after every `jj` command that finishes in a Tern pane. Outside a repository it shows

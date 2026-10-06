@@ -1,19 +1,15 @@
-/* Jujutsu views, styled after Tern's Git block. Scoped to the plugin's block
-   and its lens so nothing leaks into other surfaces. Every class carries the
-   prefix `graph.P` (`jj7-`): an attached remote host's copy of this sheet,
-   installed after ours, matches only the classes of its own version. Change the
-   prefix in both places whenever this sheet changes. */
+/* Jujutsu views, styled after Tern's Git block. */
 
 /* ── Lanes: one color per graph column, from the theme ─────────────────── */
-.jj7-l0 { --lane: var(--accent); }
-.jj7-l1 { --lane: var(--live); }
-.jj7-l2 { --lane: var(--ok); }
-.jj7-l3 { --lane: var(--warn); }
-.jj7-l4 { --lane: var(--tk-type, var(--accent)); }
-.jj7-l5 { --lane: var(--ink-pen, var(--bad)); }
+.jj-l0 { --lane: var(--accent); }
+.jj-l1 { --lane: var(--live); }
+.jj-l2 { --lane: var(--ok); }
+.jj-l3 { --lane: var(--warn); }
+.jj-l4 { --lane: var(--tk-type, var(--accent)); }
+.jj-l5 { --lane: var(--ink-pen, var(--bad)); }
 
 /* ── Rows ───────────────────────────────────────────────────────────────── */
-.jj7-r {
+.jj-r {
 	display: flex;
 	align-items: center;
 	gap: 10px;
@@ -23,24 +19,24 @@
 	font-size: 13px;
 	color: var(--t1);
 }
-.jj7-r.jj7-edge {
+.jj-r.jj-edge {
 	min-height: calc(var(--sf-lh, 18px) * 0.7);
 }
-.jj7-r.jj7-pick {
+.jj-r.jj-pick {
 	cursor: default;
 	border-radius: 6px;
 }
-.jj7-r.jj7-pick:hover {
+.jj-r.jj-pick:hover {
 	background: var(--l1);
 }
-.jj7-r.jj7-sel,
-.jj7-r.jj7-sel:hover {
+.jj-r.jj-sel,
+.jj-r.jj-sel:hover {
 	background: color-mix(in srgb, var(--accent) 14%, transparent);
 	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--accent) 35%, transparent);
 }
 
 /* Columns */
-.jj7-refs {
+.jj-refs {
 	display: flex;
 	align-items: center;
 	gap: 4px;
@@ -48,7 +44,7 @@
 	flex: none;
 	overflow: hidden;
 }
-.jj7-cline {
+.jj-cline {
 	flex: 1;
 	align-self: stretch;
 	min-width: 6px;
@@ -56,7 +52,7 @@
 }
 /* Spare width goes to the description; its `min` (set by the block) is the floor below
    which the rows scroll sideways. `width: 0` keeps long text out of the row's minimum. */
-.jj7-msg {
+.jj-msg {
 	display: flex;
 	align-items: center;
 	gap: 8px;
@@ -65,32 +61,32 @@
 	min-width: 0;
 	overflow: clip;
 }
-.jj7-bar {
+.jj-bar {
 	flex: none;
 	width: 3px;
 	height: 15px;
 	border-radius: 2px;
 	background: var(--lane);
 }
-.jj7-date {
+.jj-date {
 	flex: none;
 	color: var(--t3);
 	font-variant-numeric: tabular-nums;
 }
-.jj7-id {
+.jj-id {
 	flex: none;
 	font-family: var(--mono);
 	font-size: 12px;
 	color: var(--t3);
 }
-.jj7-id .jj7-idp,
-.jj7-id.jj7-idp {
+.jj-id .jj-idp,
+.jj-id.jj-idp {
 	color: var(--accent-ink);
 	font-weight: 600;
 }
 
 /* Ref pills */
-.jj7-pill {
+.jj-pill {
 	display: inline-flex;
 	align-items: center;
 	gap: 4px;
@@ -107,29 +103,29 @@
 	box-shadow: inset 0 0 0 1px var(--l3);
 	background: var(--card);
 }
-.jj7-pill.jj7-bm {
+.jj-pill.jj-bm {
 	color: var(--live);
 	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--live) 45%, transparent);
 }
-.jj7-pill.jj7-bm.jj7-here {
+.jj-pill.jj-bm.jj-here {
 	color: #fff;
 	background: var(--accent-fill);
 	box-shadow: none;
 }
-.jj7-pill.jj7-tag {
+.jj-pill.jj-tag {
 	color: var(--warn);
 	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--warn) 50%, transparent);
 }
-.jj7-pill.jj7-wc {
+.jj-pill.jj-wc {
 	color: var(--ok);
 	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--ok) 45%, transparent);
 	background: color-mix(in srgb, var(--ok) 10%, transparent);
 }
-.jj7-pill.jj7-conf {
+.jj-pill.jj-conf {
 	color: var(--bad);
 	box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--bad) 45%, transparent);
 }
-.jj7-pill.jj7-stat {
+.jj-pill.jj-stat {
 	color: var(--warn);
 	background: color-mix(in srgb, var(--warn) 12%, transparent);
 	box-shadow: none;
@@ -139,119 +135,119 @@
 /* Strokes are 2 px of the screen whatever the zoom (the region's `zoom` is font / 13): at a
    fractional width, a curve's border and a neighbour's straight stroke round to the device's
    pixels differently and meet with a jog. Cells and rows sit at fractional positions, so a
-   stroke that reaches its cell's edge runs on `--jj7-hw` (1 px of the screen) into the next
+   stroke that reaches its cell's edge runs on `--jj-hw` (1 px of the screen) into the next
    cell, under that cell's own stroke: two strokes that only met at the edge would each cover
    part of the edge's pixel and leave a faint seam. */
-.jj7-g {
-	--jj7-hw: calc(1px / var(--sf-zoom, 1));
+.jj-g {
+	--jj-hw: calc(1px / var(--sf-zoom, 1));
 	display: flex;
 	align-self: stretch;
 	flex: none;
 	position: relative;
 	isolation: isolate;
 }
-.jj7-gs,
-.jj7-gc {
+.jj-gs,
+.jj-gc {
 	display: block;
 	flex: none;
 	position: relative;
 }
-.jj7-st::before,
-.jj7-sb::before {
+.jj-st::before,
+.jj-sb::before {
 	content: "";
 	position: absolute;
-	left: calc(50% - var(--jj7-hw));
-	width: calc(2 * var(--jj7-hw));
+	left: calc(50% - var(--jj-hw));
+	width: calc(2 * var(--jj-hw));
 	top: 50%;
 	bottom: 50%;
 	background: var(--lane);
 }
-.jj7-st::before { top: calc(-1 * var(--jj7-hw)); }
-.jj7-sb::before { bottom: calc(-1 * var(--jj7-hw)); }
+.jj-st::before { top: calc(-1 * var(--jj-hw)); }
+.jj-sb::before { bottom: calc(-1 * var(--jj-hw)); }
 /* A ring's middle is see-through, so the lane stops at its border rather than showing through:
    above the node on `::before`, below it on `::after` (a node cell has no horizontal stroke). */
-.jj7-nw { --jj7-gap: 6px; }
-.jj7-nr { --jj7-gap: 4px; }
-.jj7-nw.jj7-sb::before,
-.jj7-nr.jj7-sb::before { top: calc(50% + var(--jj7-gap)); }
-.jj7-nw.jj7-st::before,
-.jj7-nr.jj7-st::before { top: calc(-1 * var(--jj7-hw)); bottom: calc(50% + var(--jj7-gap)); }
-.jj7-nw.jj7-st.jj7-sb::after,
-.jj7-nr.jj7-st.jj7-sb::after {
+.jj-nw { --jj-gap: 6px; }
+.jj-nr { --jj-gap: 4px; }
+.jj-nw.jj-sb::before,
+.jj-nr.jj-sb::before { top: calc(50% + var(--jj-gap)); }
+.jj-nw.jj-st::before,
+.jj-nr.jj-st::before { top: calc(-1 * var(--jj-hw)); bottom: calc(50% + var(--jj-gap)); }
+.jj-nw.jj-st.jj-sb::after,
+.jj-nr.jj-st.jj-sb::after {
 	content: "";
 	position: absolute;
-	left: calc(50% - var(--jj7-hw));
-	width: calc(2 * var(--jj7-hw));
-	top: calc(50% + var(--jj7-gap));
-	bottom: calc(-1 * var(--jj7-hw));
+	left: calc(50% - var(--jj-hw));
+	width: calc(2 * var(--jj-hw));
+	top: calc(50% + var(--jj-gap));
+	bottom: calc(-1 * var(--jj-hw));
 	background: var(--lane);
 }
-.jj7-el::before {
+.jj-el::before {
 	background: none;
-	border-left: calc(2 * var(--jj7-hw)) dotted var(--lane);
+	border-left: calc(2 * var(--jj-hw)) dotted var(--lane);
 	width: 0;
 }
-.jj7-sl::after,
-.jj7-sr::after {
+.jj-sl::after,
+.jj-sr::after {
 	content: "";
 	position: absolute;
-	top: calc(50% - var(--jj7-hw));
-	height: calc(2 * var(--jj7-hw));
+	top: calc(50% - var(--jj-hw));
+	height: calc(2 * var(--jj-hw));
 	left: 50%;
 	right: 50%;
 	background: var(--lane);
 }
-.jj7-sl::after { left: calc(-1 * var(--jj7-hw)); }
-.jj7-sr::after { right: calc(-1 * var(--jj7-hw)); }
+.jj-sl::after { left: calc(-1 * var(--jj-hw)); }
+.jj-sr::after { right: calc(-1 * var(--jj-hw)); }
 /* A hop over a vertical lane: the lane runs through, the hop sits on top with a gap. */
-.jj7-x::before {
+.jj-x::before {
 	content: "";
 	position: absolute;
-	left: calc(50% - var(--jj7-hw));
-	width: calc(2 * var(--jj7-hw));
-	top: calc(-1 * var(--jj7-hw));
-	bottom: calc(-1 * var(--jj7-hw));
+	left: calc(50% - var(--jj-hw));
+	width: calc(2 * var(--jj-hw));
+	top: calc(-1 * var(--jj-hw));
+	bottom: calc(-1 * var(--jj-hw));
 	background: var(--lane);
 }
-.jj7-x::after {
+.jj-x::after {
 	z-index: 1;
 	box-shadow: 0 -2px 0 0 var(--panel, var(--card)), 0 2px 0 0 var(--panel, var(--card));
 }
 /* A turn: one corner of a rounded, lane-bordered box, seen through a window over the quarter of
    the cell between the edge on its horizontal side and the edge on its vertical side. The window
-   reaches `--jj7-hw` past the quarter on every side, so its clip never shaves a border and the
+   reaches `--jj-hw` past the quarter on every side, so its clip never shaves a border and the
    legs run on into the next cells like the straight strokes. */
-.jj7-k {
+.jj-k {
 	position: absolute;
 	overflow: hidden;
 }
-.jj7-k::before {
+.jj-k::before {
 	content: "";
 	position: absolute;
 	box-sizing: border-box;
 	width: 200%;
 	height: 200%;
-	border: calc(2 * var(--jj7-hw)) solid var(--lane);
+	border: calc(2 * var(--jj-hw)) solid var(--lane);
 	border-radius: 6px;
 }
-.jj7-k-lb,
-.jj7-k-lt { left: calc(-1 * var(--jj7-hw)); right: calc(50% - 2 * var(--jj7-hw)); }
-.jj7-k-rb,
-.jj7-k-rt { left: calc(50% - 2 * var(--jj7-hw)); right: calc(-1 * var(--jj7-hw)); }
-.jj7-k-lb,
-.jj7-k-rb { top: calc(50% - 2 * var(--jj7-hw)); bottom: calc(-1 * var(--jj7-hw)); }
-.jj7-k-lt,
-.jj7-k-rt { top: calc(-1 * var(--jj7-hw)); bottom: calc(50% - 2 * var(--jj7-hw)); }
-.jj7-k-lb::before { top: var(--jj7-hw); right: var(--jj7-hw); }
-.jj7-k-lt::before { bottom: var(--jj7-hw); right: var(--jj7-hw); }
-.jj7-k-rb::before { top: var(--jj7-hw); left: var(--jj7-hw); }
-.jj7-k-rt::before { bottom: var(--jj7-hw); left: var(--jj7-hw); }
+.jj-k-lb,
+.jj-k-lt { left: calc(-1 * var(--jj-hw)); right: calc(50% - 2 * var(--jj-hw)); }
+.jj-k-rb,
+.jj-k-rt { left: calc(50% - 2 * var(--jj-hw)); right: calc(-1 * var(--jj-hw)); }
+.jj-k-lb,
+.jj-k-rb { top: calc(50% - 2 * var(--jj-hw)); bottom: calc(-1 * var(--jj-hw)); }
+.jj-k-lt,
+.jj-k-rt { top: calc(-1 * var(--jj-hw)); bottom: calc(50% - 2 * var(--jj-hw)); }
+.jj-k-lb::before { top: var(--jj-hw); right: var(--jj-hw); }
+.jj-k-lt::before { bottom: var(--jj-hw); right: var(--jj-hw); }
+.jj-k-rb::before { top: var(--jj-hw); left: var(--jj-hw); }
+.jj-k-rt::before { bottom: var(--jj-hw); left: var(--jj-hw); }
 /* The thin connector from a row's ref pills to its node. */
-.jj7-cx {
+.jj-cx {
 	background: linear-gradient(var(--l3), var(--l3)) center / 100% 1px no-repeat;
 }
 /* ...bridging the row's flex gap between the ref column and the graph. */
-.jj7-gx::before {
+.jj-gx::before {
 	content: "";
 	position: absolute;
 	right: 100%;
@@ -260,12 +256,12 @@
 	height: 1px;
 	background: var(--l3);
 }
-.jj7-cxh {
+.jj-cxh {
 	background: linear-gradient(var(--l3), var(--l3)) left center / 50% 1px no-repeat;
 }
 
 /* Nodes */
-.jj7-n {
+.jj-n {
 	position: absolute;
 	z-index: 1;
 	left: 50%;
@@ -278,7 +274,7 @@
 	border: 2px solid var(--lane);
 	background: var(--panel, var(--card));
 }
-.jj7-n.jj7-av {
+.jj-n.jj-av {
 	width: 19px;
 	height: 19px;
 	border: 2px solid var(--panel, var(--card));
@@ -293,32 +289,32 @@
 	color: #fff;
 	background: var(--av);
 }
-.jj7-a0 { --av: #3b82f6; }
-.jj7-a1 { --av: #db2777; }
-.jj7-a2 { --av: #10b981; }
-.jj7-a3 { --av: #8b5cf6; }
-.jj7-a4 { --av: #0ea5e9; }
-.jj7-a5 { --av: #f59e0b; }
-.jj7-a6 { --av: #0d9488; }
-.jj7-a7 { --av: #dc2626; }
-.jj7-n-conflict.jj7-av {
+.jj-a0 { --av: #3b82f6; }
+.jj-a1 { --av: #db2777; }
+.jj-a2 { --av: #10b981; }
+.jj-a3 { --av: #8b5cf6; }
+.jj-a4 { --av: #0ea5e9; }
+.jj-a5 { --av: #f59e0b; }
+.jj-a6 { --av: #0d9488; }
+.jj-a7 { --av: #dc2626; }
+.jj-n-conflict.jj-av {
 	--av: var(--bad-fill, var(--bad));
 	box-shadow: 0 0 0 1.5px var(--bad);
 }
-.jj7-n-wc {
+.jj-n-wc {
 	width: 14px;
 	height: 14px;
 	border: 2px solid var(--accent);
 	box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 22%, transparent);
 }
-.jj7-n-wc::after {
+.jj-n-wc::after {
 	content: "";
 	position: absolute;
 	inset: 2px;
 	border-radius: 50%;
 	background: var(--accent);
 }
-.jj7-n-immutable {
+.jj-n-immutable {
 	width: 10px;
 	height: 10px;
 	border-radius: 2px;
@@ -326,10 +322,10 @@
 	background: var(--lane);
 	border-color: var(--lane);
 }
-.jj7-n-hidden {
+.jj-n-hidden {
 	border-style: dashed;
 }
-.jj7-n-immutable.jj7-av {
+.jj-n-immutable.jj-av {
 	width: 19px;
 	height: 19px;
 	border-radius: 50%;
@@ -354,7 +350,7 @@
 }
 /* The toolbar+header and the rows+footer: as wide as a row's columns at their minimum
    (the description's `min`), at least the pane, so both scroll sideways together. */
-.sf-main[data-surface='plugin.jj.changes'] > .jj7-top,
+.sf-main[data-surface='plugin.jj.changes'] > .jj-top,
 .sf-main[data-surface='plugin.jj.changes'] > [data-role='jj.rows'] {
 	width: max-content;
 	min-width: 100%;
@@ -362,7 +358,7 @@
 .sf-main[data-surface='plugin.jj.changes'] > [data-role='jj.rows'] {
 	padding-top: 6px;
 }
-.jj7-top {
+.jj-top {
 	position: sticky;
 	top: 0;
 	z-index: 2;
@@ -371,7 +367,7 @@
 	font-family: var(--sans);
 }
 /* Capped at the pane's width by the block, it stays put while the rows scroll sideways. */
-.jj7-bar-row {
+.jj-bar-row {
 	position: sticky;
 	left: 0;
 	display: flex;
@@ -380,7 +376,7 @@
 	padding: 6px 10px 6px 8px;
 	font-size: 13px;
 }
-.jj7-bar-row .jj7-where {
+.jj-bar-row .jj-where {
 	display: flex;
 	align-items: center;
 	gap: 6px;
@@ -391,16 +387,16 @@
 	overflow: hidden;
 	text-overflow: ellipsis;
 }
-.jj7-bar-row .jj7-sep {
+.jj-bar-row .jj-sep {
 	width: 1px;
 	height: 16px;
 	background: var(--l2);
 	margin: 0 4px;
 }
-.jj7-bar-row .jj7-grow {
+.jj-bar-row .jj-grow {
 	flex: 1;
 }
-.jj7-btn {
+.jj-btn {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -409,32 +405,32 @@
 	border-radius: 6px;
 	color: var(--t2);
 }
-.jj7-btn:hover {
+.jj-btn:hover {
 	background: var(--l1);
 	color: var(--t1);
 }
-.jj7-btn.jj7-busy {
+.jj-btn.jj-busy {
 	color: var(--accent);
 }
-.jj7-hd {
+.jj-hd {
 	min-height: 26px;
 	color: var(--t3);
 	font-size: 12px;
 	border-top: 1px solid var(--l1);
 }
-.jj7-hd > span {
+.jj-hd > span {
 	flex: none;
 	white-space: nowrap;
 	overflow: clip;
 }
-/* Sized like `.jj7-msg`; the label starts where the descriptions do, past the lane bar. */
-.jj7-hd > .jj7-hd-msg {
+/* Sized like `.jj-msg`; the label starts where the descriptions do, past the lane bar. */
+.jj-hd > .jj-hd-msg {
 	flex: 1 1 0;
 	width: 0;
 	box-sizing: border-box;
 	padding-left: 11px;
 }
-.jj7-foot {
+.jj-foot {
 	display: flex;
 	align-items: center;
 	justify-content: center;
@@ -444,7 +440,7 @@
 	font-family: var(--sans);
 	font-size: 12px;
 }
-.jj7-foot::before {
+.jj-foot::before {
 	content: "";
 	width: 5px;
 	height: 5px;
@@ -453,7 +449,7 @@
 }
 
 /* The dock lines start where the rows' content does. */
-.jj7-dock {
+.jj-dock {
 	display: flex;
 	flex-direction: column;
 	padding: 0 10px 0 6px;

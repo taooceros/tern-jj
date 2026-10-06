@@ -9,17 +9,6 @@ local ui = tern.ui
 
 local M = {}
 
--- The prefix of every class the plugin's views use and every selector in `jj.css`. Attached
--- remote hosts send their own copy of the plugin's stylesheet, which the window installs after
--- ours; a sheet from another version must not match these elements. Change it together with
--- the prefix in `jj.css` whenever the stylesheet changes.
-M.P = "jj7-"
-
--- `names` (space-separated) as prefixed classes.
-function M.cls(names: string): string
-	return (string.gsub(names, "%S+", M.P .. "%0"))
-end
-
 -- Strokes of each line glyph jj's curved and square styles draw.
 local STROKES: { [string]: string } = {
 	["│"] = "tb",
@@ -183,22 +172,22 @@ end
 
 local function spacer(n: number, connector: boolean): Node
 	local w = M.span(n)
-	return ui.el("span", { class = M.cls(if connector then "gs cx" else "gs"), min = { w = w }, max = { w = w } })
+	return ui.el("span", { class = if connector then "jj-gs jj-cx" else "jj-gs", min = { w = w }, max = { w = w } })
 end
 
 -- The node: an avatar with the author's initials for an ordinary change, a
 -- ring for the working copy, a diamond for an immutable one.
 local function node(row: GraphRow): Node
 	local kind = row.kind or "node"
-	local class = "n n-" .. kind
+	local class = "jj-n jj-n-" .. kind
 	if row.avatar then
-		class ..= " a" .. row.avatar
+		class ..= " jj-a" .. row.avatar
 	end
 	local label = row.label
 	if label and kind ~= "wc" then
-		return ui.el("span", { class = M.cls(class .. " av"), text = label })
+		return ui.el("span", { class = class .. " jj-av", text = label })
 	end
-	return ui.el("span", { class = M.cls(class) })
+	return ui.el("span", { class = class })
 end
 
 local function has(c: Cell?, s: string): boolean
@@ -268,21 +257,21 @@ function M.view(row: GraphRow, width: number): Node
 				table.insert(kids, spacer(blank, before_node))
 				blank = 0
 			end
-			local class = "gc l" .. ((i - 1) // 2) % 6
+			local class = "jj-gc jj-l" .. ((i - 1) // 2) % 6
 			local quadrant, straight = turn(row.cells, i)
 			for s in string.gmatch(straight, ".") do
-				class ..= " s" .. s
+				class ..= " jj-s" .. s
 			end
 			if c.elided then
-				class ..= " el"
+				class ..= " jj-el"
 			end
 			if c.cross then
-				class ..= " x"
+				class ..= " jj-x"
 			end
 			if before_node then
-				class ..= " cx"
+				class ..= " jj-cx"
 			elseif c.node and row.connect then
-				class ..= " cxh"
+				class ..= " jj-cxh"
 			end
 			local w = M.span(1)
 			local inner: { Node }? = nil
@@ -291,21 +280,21 @@ function M.view(row: GraphRow, width: number): Node
 				-- The working copy's ring and a plain ring are see-through: the lane stops at them.
 				local kind = row.kind or "node"
 				if kind == "wc" then
-					class ..= " nw"
+					class ..= " jj-nw"
 				elseif not row.label and kind ~= "immutable" then
-					class ..= " nr"
+					class ..= " jj-nr"
 				end
 			elseif quadrant then
-				inner = { ui.el("span", { class = M.cls("k k-" .. quadrant) }) }
+				inner = { ui.el("span", { class = "jj-k jj-k-" .. quadrant }) }
 			end
-			table.insert(kids, ui.el("span", { class = M.cls(class), min = { w = w }, max = { w = w } }, inner))
+			table.insert(kids, ui.el("span", { class = class, min = { w = w }, max = { w = w } }, inner))
 		end
 	end
 	blank += width - #row.cells
 	if blank > 0 then
 		table.insert(kids, spacer(blank, false))
 	end
-	return ui.el("div", { class = M.cls(if row.connect then "g gx" else "g") }, kids)
+	return ui.el("div", { class = if row.connect then "jj-g jj-gx" else "jj-g" }, kids)
 end
 
 return M
