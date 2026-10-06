@@ -1,7 +1,7 @@
 schema = 1
 id = "jj"
 name = "Jujutsu"
-version = "0.10.0"
+version = "0.10.1"
 description = "Native Jujutsu status and log output, and a changes block."
 icon = "commit"
 host = "host.luau"
