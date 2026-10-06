@@ -418,15 +418,15 @@
 .jj-n-hidden {
 	border-style: dashed;
 }
+/* An immutable change's avatar looks like any other (a solid ring, as in Tern's Git block):
+   only the diamond shape, kept where it has no avatar, marks it immutable. */
 .jj-n-immutable.jj-av {
 	width: 19px;
 	height: 19px;
 	border-radius: 50%;
 	transform: translate(-50%, -50%);
-	border-color: var(--panel, var(--card));
+	border: 2px solid var(--panel, var(--card));
 	background: var(--av);
-	border: calc(2 * var(--jj-hw)) dashed var(--lane);
-	background-clip: padding-box;
 }
 
 /* ── Block chrome: toolbar, column header, footer ───────────────────────── */
